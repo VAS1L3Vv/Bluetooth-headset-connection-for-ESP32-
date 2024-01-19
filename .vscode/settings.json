@@ -1,0 +1,10 @@
+{
+    "idf.adapterTargetName": "esp32",
+    "idf.flashType": "UART",
+    "idf.portWin": "COM11",
+    "files.associations": {
+        "sco_demo_util.h": "c",
+        "btstack_config.h": "c",
+        "stdio.h": "c"
+    }
+}

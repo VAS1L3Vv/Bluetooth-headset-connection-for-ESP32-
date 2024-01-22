@@ -6,13 +6,12 @@
 #include <string.h>
 
 #include "btstack.h"
-#include "sco_util.h"
+#include "audio_control.h"
+
 #ifdef HAVE_BTSTACK_STDIN
 #include "btstack_stdin.h"
 #endif
 
-// uncomment to temp disable mSBC codec
-#undef ENABLE_HFP_WIDE_BAND_SPEECH
 #define MAX_BUFFER_SIZE_BYTES 960000
 #define INQUIRY_INTERVAL 5
 
@@ -414,19 +413,6 @@ void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * event, uint
     }
 }
 
-// static void hfp_outgoing_call_ringing_handler(btstack_timer_source_t * timer){
-//     UNUSED(timer);
-//     printf("Simulate call connected -> start ringing\n");
-//     hfp_ag_outgoing_call_ringing();
-// }
-
-// static void hfp_outgoing_call_ringing_start(void){
-//     btstack_run_loop_set_timer_handler(&hfp_outgoing_call_ringing_timer, hfp_outgoing_call_ringing_handler);
-//     btstack_run_loop_set_timer(&hfp_outgoing_call_ringing_timer, 1000); // 1 second timeout
-//     btstack_run_loop_add_timer(&hfp_outgoing_call_ringing_timer);
-// }
-
-
 // ГЛАВНЫЙ НАСТРОИЧНЫЙ КОД ПОДКЛЮЧЕНИЯ К HFP HF
 
 int btstack_main(int argc, const char * argv[]);
@@ -439,23 +425,27 @@ int btstack_main(int argc, const char * argv[])
 
     // Request role change on reconnecting headset to always use them in slave mode
     hci_set_master_slave_policy(0);
-    gap_set_local_name("HFP AG Demo 00:00:00:00:00:00");
+    gap_set_local_name("");
     gap_discoverable_control(0); // указываем, что наше устройство является не обнаруживаемым. 
-    /*
-    !!!! ВОЗМОЖНО СТОИТ ОТКЛЮЧИТЬ !!!!
-    */
 
     // L2CAP
     l2cap_init(); // init L2CAP
 
     uint16_t supported_features                   =
+        (1<<HFP_AGSF_ESCO_S4)                     |
         (1<<HFP_AGSF_HF_INDICATORS)               |
         (1<<HFP_AGSF_CODEC_NEGOTIATION)           |
         (1<<HFP_AGSF_EXTENDED_ERROR_RESULT_CODES) |
-        // (1<<HFP_AGSF_ENHANCED_CALL_CONTROL)   ы    |
-        // (1<<HFP_AGSF_ENHANCED_CALL_STATUS)        |
-        (1<<HFP_AGSF_EC_NR_FUNCTION);
-    int wide_band_speech = 1;
+        (1<<HFP_AGSF_ENHANCED_CALL_CONTROL)       |
+        (1<<HFP_AGSF_ENHANCED_CALL_STATUS)        |
+        (1<<HFP_AGSF_ABILITY_TO_REJECT_A_CALL)    |
+        (1<<HFP_AGSF_IN_BAND_RING_TONE)           |
+        (1<<HFP_AGSF_VOICE_RECOGNITION_FUNCTION)  |
+        (1<<HFP_AGSF_ENHANCED_VOICE_RECOGNITION_STATUS) |
+        (1<<HFP_AGSF_VOICE_RECOGNITION_TEXT) |
+        (1<<HFP_AGSF_EC_NR_FUNCTION) |
+        (1<<HFP_AGSF_THREE_WAY_CALLING);
+    int wide_band_speech = 0;
 
     // HFP
     rfcomm_init();

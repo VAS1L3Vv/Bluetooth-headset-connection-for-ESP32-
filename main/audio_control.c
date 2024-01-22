@@ -1,7 +1,7 @@
 #define BTSTACK_FILE__ "sco_util.c"
 
 #include <stdio.h>
-#include "sco_util.h"
+#include "audio_control.h"
 #include "btstack_audio.h"
 #include "btstack_debug.h"
 #include "btstack_ring_buffer.h"
@@ -39,7 +39,7 @@ static btstack_ring_buffer_t audio_output_ring_buffer;
 
 // input
 
-#define USE_AUDIO_INPUT
+// #define USE_AUDIO_INPUT
 
 static void (*add_speech_to_buffer)(uint16_t num_samples, int16_t * data);
 

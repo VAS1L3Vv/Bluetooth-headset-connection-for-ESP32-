@@ -5,6 +5,8 @@
     "files.associations": {
         "sco_demo_util.h": "c",
         "btstack_config.h": "c",
-        "stdio.h": "c"
+        "stdio.h": "c",
+        "sco_util.h": "c",
+        "btstack_debug.h": "c"
     }
 }

@@ -2,7 +2,7 @@
 
 #include <stdio.h>
 #include "audio_control.h"
-#include "btstack_audio.h"
+#include "audio_driver.h"
 #include "btstack_debug.h"
 #include "btstack_ring_buffer.h"
 #include "classic/btstack_cvsd_plc.h"
@@ -132,7 +132,7 @@ static int audio_initialize(int sample_rate){
     btstack_ring_buffer_init(&audio_output_ring_buffer, audio_output_ring_buffer_storage, sizeof(audio_output_ring_buffer_storage));
 
     // config and setup audio playback
-    const btstack_audio_sink_t * audio_sink = btstack_audio_sink_get_instance();
+    const btstack_audio_sink_t * audio_sink = btstack_audio_esp32_sink_get_instance();
     if (audio_sink != NULL){
         audio_sink->init(1, sample_rate, &audio_playback_callback);
         audio_sink->start_stream();
@@ -148,7 +148,7 @@ static int audio_initialize(int sample_rate){
 
 #ifdef USE_AUDIO_INPUT
     // config and setup audio recording
-    const btstack_audio_source_t * audio_source = btstack_audio_source_get_instance();
+    const btstack_audio_source_t * audio_source = btstack_audio_esp32_source_get_instance();
     if (audio_source != NULL){
         audio_source->init(1, sample_rate, &audio_recording_callback);
         audio_source->start_stream();
@@ -162,12 +162,12 @@ static int audio_initialize(int sample_rate){
 
 static void audio_terminate(void)
 {
-    const btstack_audio_sink_t * audio_sink = btstack_audio_sink_get_instance();
+    const btstack_audio_sink_t * audio_sink = btstack_audio_esp32_sink_get_instance();
     if (!audio_sink) return;
     audio_sink->close();
 
 #ifdef USE_AUDIO_INPUT
-    const btstack_audio_source_t * audio_source= btstack_audio_source_get_instance();
+    const btstack_audio_source_t * audio_source= btstack_audio_esp32_source_get_instance();
     if (!audio_source) return;
     audio_source->close();
 #endif

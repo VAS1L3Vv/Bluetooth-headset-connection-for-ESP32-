@@ -69,7 +69,7 @@ static void show_usage(void){
     printf("\n--- Bluetooth HFP Audiogateway (AG) unit Test Console %s ---\n", bd_addr_to_str(iut_address));
     printf("\n");
     printf("1 - scan nearby HF units\n");
-    // соъздадим базу даннных макс. из 20 устройств для подключения 
+    // соъздадим базу даннных макс. из 10 устройств для подключения 
     printf("2 - establish HFP connection %s\n", bd_addr_to_str(device_addr));
     printf("3 - release HFP connection\n");
     printf("4 - establish audio connection\n");
@@ -78,7 +78,6 @@ static void show_usage(void){
     printf("7 - playback recorded audio\n");
     printf("8 - playback codec2 audio\n");
     printf("9 - abort voice n clear buffer\n\n\n");
-
     printf("a - report AG failure\n");
     printf("b - delete all link keys\n");
     printf("c - Set signal strength to 0            | C - Set signal strength to 5\n");
@@ -90,14 +89,6 @@ static void show_usage(void){
     printf("T - terminate connection\n");
     printf("---\n");
 }
-
-uint32_t record_bt_mic(int16_t * buf_rd, uint8_t secs)
-{
-    uint32_t bytes_read = 0;
-
-    return bytes_read;
-}
-
 
 void stdin_process(char cmd){
     uint8_t status = ERROR_CODE_SUCCESS;

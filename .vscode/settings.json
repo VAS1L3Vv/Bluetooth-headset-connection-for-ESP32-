@@ -7,6 +7,8 @@
         "btstack_config.h": "c",
         "stdio.h": "c",
         "sco_util.h": "c",
-        "btstack_debug.h": "c"
+        "btstack_debug.h": "c",
+        "audio_driver.h": "c",
+        "btstack_audio.h": "c"
     }
 }

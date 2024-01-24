@@ -1,7 +1,7 @@
 {
     "idf.adapterTargetName": "esp32",
     "idf.flashType": "UART",
-    "idf.portWin": "COM11",
+    "idf.portWin": "COM14",
     "files.associations": {
         "sco_demo_util.h": "c",
         "btstack_config.h": "c",
@@ -9,6 +9,8 @@
         "sco_util.h": "c",
         "btstack_debug.h": "c",
         "audio_driver.h": "c",
-        "btstack_audio.h": "c"
+        "btstack_audio.h": "c",
+        "btstack_cvsd_plc.h": "c",
+        "audio_control.h": "c"
     }
 }

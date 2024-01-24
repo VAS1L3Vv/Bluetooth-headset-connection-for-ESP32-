@@ -15,8 +15,13 @@
 
 // SINK Implementation
 
+static uint8_t  btstack_audio_esp32_sink_num_channels;
+static uint32_t btstack_audio_esp32_sink_samplerate;
 static uint8_t btstack_audio_esp32_sink_buffer[MAX_DMA_BUFFER_SAMPLES * BYTES_PER_SAMPLE_STEREO];
 static bool btstack_audio_esp32_sink_buffer_ready;
+static btstack_audio_esp32_state_t btstack_audio_esp32_sink_state;
+
+static void (*btstack_audio_esp32_sink_playback_callback)(int16_t * buffer, uint16_t num_samples);
 
 static void btstack_audio_esp32_sink_fill_buffer(void){
 
@@ -135,4 +140,3 @@ static const btstack_audio_sink_t btstack_audio_esp32_sink = {
 const btstack_audio_sink_t * btstack_audio_esp32_sink_get_instance(void){
     return &btstack_audio_esp32_sink;
 }
-

@@ -41,18 +41,7 @@ static uint16_t btstack_audio_esp32_samples_per_dma_buffer;
 // timer to fill output ring buffer
 static btstack_timer_source_t  btstack_audio_esp32_driver_timer;
 
-static uint8_t  btstack_audio_esp32_sink_num_channels;
-static uint32_t btstack_audio_esp32_sink_samplerate;
-
-static uint8_t  btstack_audio_esp32_source_num_channels;
-static uint32_t btstack_audio_esp32_source_samplerate;
-
-static btstack_audio_esp32_state_t btstack_audio_esp32_sink_state;
-static btstack_audio_esp32_state_t btstack_audio_esp32_source_state;
-
 // client
-static void (*btstack_audio_esp32_sink_playback_callback)(int16_t * buffer, uint16_t num_samples);
-static void (*btstack_audio_esp32_source_recording_callback)(const int16_t * buffer, uint16_t num_samples);
 
 // queue for RX/TX done events
 static QueueHandle_t btstack_audio_esp32_i2s_event_queue;

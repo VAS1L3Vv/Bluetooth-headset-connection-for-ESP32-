@@ -13,7 +13,7 @@
 #endif
 
 #define MAX_BUFFER_SIZE_BYTES 960000
-#define INQUIRY_INTERVAL 5
+#define INQUIRY_INTERVAL 10
 
 uint8_t hfp_service_buffer[150];
 const uint8_t    rfcomm_channel_nr = 1;
@@ -24,8 +24,6 @@ static const char * device_addr_string = "A1:2A:A9:B0:AD:31";
 
 static uint8_t codecs[] = {HFP_CODEC_CVSD};
 static uint8_t negotiated_codec = HFP_CODEC_CVSD;
-
-
 static hci_con_handle_t acl_handle = HCI_CON_HANDLE_INVALID;
 static hci_con_handle_t sco_handle = HCI_CON_HANDLE_INVALID;
 static btstack_packet_callback_registration_t hci_event_callback_registration;

@@ -1,3 +1,3 @@
-idf_component_register(SRCS "audio_driver.c"
+idf_component_register(SRCS
                     INCLUDE_DIRS "include"
                     REQUIRES btstack)

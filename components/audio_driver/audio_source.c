@@ -15,6 +15,11 @@
 
 // SOURCE Implementation
 
+static uint8_t  btstack_audio_esp32_source_num_channels;
+static uint32_t btstack_audio_esp32_source_samplerate;
+static btstack_audio_esp32_state_t btstack_audio_esp32_source_state;
+static void (*btstack_audio_esp32_source_recording_callback)(const int16_t * buffer, uint16_t num_samples);
+
 static void btstack_audio_esp32_source_process_buffer(void){
     size_t bytes_read;
     uint8_t buffer[MAX_DMA_BUFFER_SAMPLES * BYTES_PER_SAMPLE_STEREO];

@@ -38,8 +38,7 @@ static uint8_t               audio_output_ring_buffer_storage[2 * PREBUFFER_BYTE
 static btstack_ring_buffer_t audio_output_ring_buffer;
 
 // input
-
-// #define USE_AUDIO_INPUT
+#define USE_AUDIO_INPUT
 
 static void (*add_speech_to_buffer)(uint16_t num_samples, int16_t * data);
 
@@ -61,7 +60,6 @@ typedef struct {
     void(*receive)(const uint8_t * packet, uint16_t size);
     void (*fill_payload)(uint8_t * payload_buffer, uint16_t sco_payload_length);
     void (*close)(void);
-    //
     uint16_t sample_rate;
 } codec_support_t;
 
@@ -73,7 +71,6 @@ static uint16_t array_position;
 #define SPEECH_SAMPLE_RATE SAMPLE_RATE_8KHZ
 #define CODEC2_SPEECH_BUFFER_SIZE 320
 
-// input signal: pre-computed int16 sine wave, 32000 Hz at 266 Hz
 static int16_t speech_buffer[CODEC2_SPEECH_BUFFER_SIZE];
 
 #ifdef USE_AUDIO_INPUT

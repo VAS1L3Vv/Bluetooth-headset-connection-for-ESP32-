@@ -93,41 +93,8 @@ typedef struct {
 
 } btstack_audio_source_t;
 
-
-static const btstack_audio_sink_t * btstack_audio_sink_instance;
-
-static const btstack_audio_source_t * btstack_audio_source_instance;
-
 const btstack_audio_sink_t *    btstack_audio_esp32_sink_get_instance(void);
 const btstack_audio_source_t *  btstack_audio_esp32_source_get_instance(void);
-
-/**
- * @brief Get BTstack Audio Sink Instance
- * @param btstack_audio_sink implementation
- */
-void btstack_audio_sink_set_instance(const btstack_audio_sink_t * audio_sink_impl);
-
-/**
- * @brief Get BTstack Audio Source Instance
- * @param btstack_audio_source implementation
- */
-void btstack_audio_source_set_instance(const btstack_audio_source_t * audio_source_impl);
-
-/**
- * @brief Get BTstack Audio Sink Instance
- * @param btstack_audio_sink implementation
- */
-void btstack_audio_sink_set_instance(const btstack_audio_sink_t * audio_sink_impl){
-	btstack_audio_sink_instance = audio_sink_impl;
-}
-
-/**
- * @brief Get BTstack Audio Source Instance
- * @param btstack_audio_source implementation
- */
-void btstack_audio_source_set_instance(const btstack_audio_source_t * audio_source_impl){
-	btstack_audio_source_instance = audio_source_impl;
-}
 
 #if defined __cplusplus
 }

@@ -11,6 +11,7 @@
         "audio_driver.h": "c",
         "btstack_audio.h": "c",
         "btstack_cvsd_plc.h": "c",
-        "audio_control.h": "c"
+        "audio_control.h": "c",
+        "btstack_ring_buffer.h": "c"
     }
 }

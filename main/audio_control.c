@@ -40,8 +40,6 @@ static btstack_ring_buffer_t audio_output_ring_buffer;
 // input
 #define USE_AUDIO_INPUT
 
-static void (*add_speech_to_buffer)(uint16_t num_samples, int16_t * data);
-
 static int                   audio_input_paused  = 0;
 static uint8_t               audio_input_ring_buffer_storage[2 * PREBUFFER_BYTES_MAX];
 static btstack_ring_buffer_t audio_input_ring_buffer;
@@ -66,30 +64,12 @@ typedef struct {
 // current configuration
 static const codec_support_t * codec_current = NULL;
 
-// Sine Wave
-static uint16_t array_position;
-#define SPEECH_SAMPLE_RATE SAMPLE_RATE_8KHZ
-#define CODEC2_SPEECH_BUFFER_SIZE 320
-
-static int16_t speech_buffer[CODEC2_SPEECH_BUFFER_SIZE];
-
 #ifdef USE_AUDIO_INPUT
 static void audio_recording_callback(const int16_t * buffer, uint16_t num_samples)
 {
     btstack_ring_buffer_write(&audio_input_ring_buffer, (uint8_t *)buffer, num_samples * 2);
 }
 #endif
-
-static void buffer_to_host_endian(uint16_t num_samples, int16_t * data){
-    unsigned int i;
-    for (i=0; i < num_samples; i++){
-        data[i] = speech_buffer[array_position];
-        array_position++;
-        if (array_position >= (sizeof(speech_buffer) / sizeof(int16_t))){
-            array_position = 0;
-        }
-    }
-}
 
 // Audio Playback / Recording
 static void audio_playback_callback(int16_t * buffer, uint16_t num_samples){
@@ -142,6 +122,7 @@ static int audio_initialize(int sample_rate){
     // init buffers
     memset(audio_input_ring_buffer_storage, 0, sizeof(audio_input_ring_buffer_storage));
     btstack_ring_buffer_init(&audio_input_ring_buffer, audio_input_ring_buffer_storage, sizeof(audio_input_ring_buffer_storage));
+    audio_input_paused = 1;
 
 #ifdef USE_AUDIO_INPUT
     // config and setup audio recording
@@ -150,7 +131,6 @@ static int audio_initialize(int sample_rate){
         audio_source->init(1, sample_rate, &audio_recording_callback);
         audio_source->start_stream();
 
-        audio_input_paused = 1;
     }
 #endif
 
@@ -276,8 +256,6 @@ void sco_set_codec(uint8_t negotiated_codec)
     audio_initialize(codec_current->sample_rate);
 
     audio_prebuffer_bytes = SCO_PREBUFFER_MS * (codec_current->sample_rate/1000) * BYTES_PER_FRAME;
-
-    add_speech_to_buffer = &buffer_to_host_endian;
 }
 
 void sco_receive(uint8_t * packet, uint16_t size){
@@ -310,17 +288,6 @@ void sco_send(hci_con_handle_t sco_handle){
 
     hci_reserve_packet_buffer(); // подготовка к отправке пакета
     uint8_t * sco_packet = hci_get_outgoing_packet_buffer(); // получаем указатель на передаваемый sco пакет
-
-    // re-fill audio buffer
-    uint16_t samples_free = btstack_ring_buffer_bytes_free(&audio_input_ring_buffer) / 2; // получения свободных в буфере байт
-   
-    while (samples_free > 0){
-        int16_t samples_buffer[REFILL_SAMPLES]; 
-        uint16_t samples_to_add = btstack_min(samples_free, REFILL_SAMPLES);
-        (*add_speech_to_buffer)(samples_to_add, samples_buffer); // записываем в каждой итерации на свободное количесво байт звуковые данные
-        btstack_ring_buffer_write(&audio_input_ring_buffer, (uint8_t *)samples_buffer, samples_to_add * 2);
-        samples_free -= samples_to_add; // пополняет буффер на сколько это возможно
-    }
 
     // resume if pre-buffer is filled
     if (audio_input_paused){

@@ -260,8 +260,8 @@ static void btstack_audio_esp32_deinit(void){
 // - with esp-idf v4.4.3, we occasionally get a TX_DONE but fail to write data without waiting for free buffers
 //   it's unclera why this happens. this code assumes that the TX_DONE event has been received prematurely and
 //   just retries the i2s_write the next time without blocking
-static uint8_t btstack_audio_esp32_sink_buffer[MAX_DMA_BUFFER_SAMPLES * BYTES_PER_SAMPLE_STEREO];
-static bool btstack_audio_esp32_sink_buffer_ready;
+static uint8_t sink_buffer[MAX_DMA_BUFFER_SAMPLES * BYTES_PER_SAMPLE_STEREO];
+static bool sink_buffer_ready;
 static void btstack_audio_esp32_sink_fill_buffer(void){
 
     btstack_assert(btstack_audio_esp32_samples_per_dma_buffer <= MAX_DMA_BUFFER_SAMPLES);
@@ -269,29 +269,29 @@ static void btstack_audio_esp32_sink_fill_buffer(void){
     // fetch new data
     size_t bytes_written;
     uint16_t data_len = btstack_audio_esp32_samples_per_dma_buffer * BYTES_PER_SAMPLE_STEREO;
-    if (btstack_audio_esp32_sink_buffer_ready == false){
+    if (sink_buffer_ready == false){
         if (btstack_audio_esp32_sink_state == BTSTACK_AUDIO_ESP32_STREAMING){
-            (*btstack_audio_esp32_sink_playback_callback)((int16_t *) btstack_audio_esp32_sink_buffer, btstack_audio_esp32_samples_per_dma_buffer);
+            (*btstack_audio_esp32_sink_playback_callback)((int16_t *) sink_buffer, btstack_audio_esp32_samples_per_dma_buffer);
             // duplicate samples for mono
             if (btstack_audio_esp32_sink_num_channels == 1){
                 int16_t i;
-                int16_t * buffer16 = (int16_t *) btstack_audio_esp32_sink_buffer;
+                int16_t * buffer16 = (int16_t *) sink_buffer;
                 for (i=btstack_audio_esp32_samples_per_dma_buffer-1;i >= 0; i--){
                     buffer16[2*i  ] = buffer16[i];
                     buffer16[2*i+1] = buffer16[i];
                 }
             }
-            btstack_audio_esp32_sink_buffer_ready = true;
+            sink_buffer_ready = true;
         } else {
-            memset(btstack_audio_esp32_sink_buffer, 0, data_len);
+            memset(sink_buffer, 0, data_len);
         }
     }
 
-    i2s_write(BTSTACK_AUDIO_I2S_NUM, btstack_audio_esp32_sink_buffer, data_len, &bytes_written, 0);
+    i2s_write(BTSTACK_AUDIO_I2S_NUM, sink_buffer, data_len, &bytes_written, 0);
 
     // check if all data has been written. tolerate writing zero bytes (->retry), but assert on partial write
     if (bytes_written == data_len){
-        btstack_audio_esp32_sink_buffer_ready = false;
+        sink_buffer_ready = false;
     } else if (bytes_written == 0){
         ESP_LOGW(LOG_TAG, "i2s_write: couldn't write after I2S_EVENT_TX_DONE\n");
     } else {
@@ -342,7 +342,7 @@ static void btstack_audio_esp32_sink_start_stream(void){
 
     // state
     btstack_audio_esp32_sink_state = BTSTACK_AUDIO_ESP32_STREAMING;
-    btstack_audio_esp32_sink_buffer_ready = false;
+    sink_buffer_ready = false;
     
     // note: conceptually, it would make sense to pre-fill all I2S buffers and then feed new ones when they are
     // marked as complete. However, it looks like we get additoinal events and then assert below, 

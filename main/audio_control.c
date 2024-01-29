@@ -152,7 +152,7 @@ static void audio_terminate(void)
 
 // CVSD - 8 kHz
 static void cvsd_init(void)
-{
+{ 
     printf("SCO Demo: Init CVSD\n");
     btstack_cvsd_plc_init(&cvsd_plc_state);
 }

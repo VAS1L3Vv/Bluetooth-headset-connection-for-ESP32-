@@ -64,7 +64,6 @@ extern int btstack_main(int argc, const char * argv[]);
 
 int app_main(void)
 {
-    
     // optional: enable packet logger
     // hci_dump_init(hci_dump_embedded_stdout_get_instance());
     // Enable buffered stdout

@@ -7,7 +7,7 @@
 
 #include "btstack.h"
 #include "audio_control.h"
-
+#include "btstack_config.h"
 #ifdef HAVE_BTSTACK_STDIN
 #include "btstack_stdin.h"
 #endif

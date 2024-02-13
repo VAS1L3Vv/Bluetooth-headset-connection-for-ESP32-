@@ -287,6 +287,7 @@ void sco_send(hci_con_handle_t sco_handle){
     int sco_payload_length = sco_packet_length - 3;
 
     hci_reserve_packet_buffer(); // подготовка к отправке пакета
+    // Получаем доступ к буферу, который будет отрпавляться по HCI
     uint8_t * sco_packet = hci_get_outgoing_packet_buffer(); // получаем указатель на передаваемый sco пакет
 
     // resume if pre-buffer is filled
@@ -298,6 +299,7 @@ void sco_send(hci_con_handle_t sco_handle){
     }
 
     // fill payload by codec
+    // Заполняем буфер звуковыми данными
     codec_current->fill_payload(&sco_packet[3], sco_payload_length);
 
     // set handle + flags

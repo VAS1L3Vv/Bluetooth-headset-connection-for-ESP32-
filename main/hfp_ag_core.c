@@ -127,67 +127,67 @@ void stdin_process(char cmd){
             printf("Deleting all link keys\n");
             gap_delete_all_link_keys();
             break;
-        case 'g':
+        case 'c':
             log_info("USER:\'%c\'", cmd);
             printf("Set signal strength to 0\n");
             status = hfp_ag_set_signal_strength(0);
             break;
-        case 'G':
+        case 'C':
             log_info("USER:\'%c\'", cmd);
             printf("Set signal strength to 5\n");
             status = hfp_ag_set_signal_strength(5);
             break;
-        case 'i':
+        case 'd':
             log_info("USER:\'%c\'", cmd);
             printf("Set battery level to 3\n");
             status = hfp_ag_set_battery_level(3);
             break;
-        case 'I':
+        case 'D':
             log_info("USER:\'%c\'", cmd);
             printf("Set battery level to 5\n");
             status = hfp_ag_set_battery_level(5);
             break;
-        case 'o':
+        case 'e':
             log_info("USER:\'%c\'", cmd);
             printf("Set speaker gain to 0 (minimum)\n");
             status = hfp_ag_set_speaker_gain(acl_handle, 0);
             break;
-        case 'O':
+        case 'E':
             log_info("USER:\'%c\'", cmd);
             printf("Set speaker gain to 9 (default)\n");
             status = hfp_ag_set_speaker_gain(acl_handle, 9);
             break;
-        case 'p':
+        case 'f':
             log_info("USER:\'%c\'", cmd);
             printf("Set speaker gain to 12 (higher)\n");
             status = hfp_ag_set_speaker_gain(acl_handle, 12);
             break;
-        case 'P':
+        case 'F':
             log_info("USER:\'%c\'", cmd);
             printf("Set speaker gain to 15 (maximum)\n");
             status = hfp_ag_set_speaker_gain(acl_handle, 15);
             break;
-        case 'q':
+        case 'g':
             log_info("USER:\'%c\'", cmd);
             printf("Set microphone gain to 0\n");
             status = hfp_ag_set_microphone_gain(acl_handle, 0);
             break;
-        case 'Q':
+        case 'G':
             log_info("USER:\'%c\'", cmd);
             printf("Set microphone gain to 9\n");
             status = hfp_ag_set_microphone_gain(acl_handle, 9);
             break;
-        case 's':
+        case 'h':
             log_info("USER:\'%c\'", cmd);
             printf("Set microphone gain to 12\n");
             status = hfp_ag_set_microphone_gain(acl_handle, 12);
             break;
-        case 'S':
+        case 'H':
             log_info("USER:\'%c\'", cmd);
             printf("Set microphone gain to 15\n");
             status = hfp_ag_set_microphone_gain(acl_handle, 15);
             break;
-        case 't':
+        case 'T':
             log_info("USER:\'%c\'", cmd);
             printf("Terminate HCI connection. 0x%2x\n", acl_handle);
             gap_disconnect(acl_handle);
@@ -442,7 +442,6 @@ int btstack_main(int argc, const char * argv[])
     hfp_ag_init_ag_indicators(ag_indicators_nr, ag_indicators);
     hfp_ag_init_hf_indicators(hf_indicators_nr, hf_indicators); 
     hfp_ag_init_call_hold_services(call_hold_services_nr, call_hold_services);
-    hfp_ag_set_subcriber_number_information(&subscriber_number, 1);
 
     // SDP Server
     sdp_init();
@@ -468,5 +467,7 @@ int btstack_main(int argc, const char * argv[])
 #endif  
     // turn on!
     hci_power_control(HCI_POWER_ON);
+
+    printf("BT device started. Ready to operate.");
     return 0;
 }

@@ -2,7 +2,6 @@
 
 #include <stdio.h>
 #include "audio_control.h"
-#include "audio_driver.h"
 #include "btstack_debug.h"
 #include "btstack_ring_buffer.h"
 #include "classic/btstack_cvsd_plc.h"
@@ -42,9 +41,6 @@ static btstack_ring_buffer_t audio_ring_buffer;
 // input
 #define USE_AUDIO_INPUT
 
-// static uint8_t               audio_input_ring_buffer_storage[2 * PREBUFFER_BYTES_MAX];
-// static btstack_ring_buffer_t audio_input_ring_buffer;
-
 static int count_sent = 0;
 static int count_received = 0;
 
@@ -65,90 +61,15 @@ typedef struct {
 // current configuration
 static const codec_support_t * codec_current = NULL;
 
-// #ifdef USE_AUDIO_INPUT
-// static void audio_recording_callback(const int16_t * buffer, uint16_t num_samples)
-// {
-//     btstack_ring_buffer_write(&audio_input_ring_buffer, (uint8_t *)buffer, num_samples * 2);
-// } 
-// #endif
-
-// Audio Playback / Recording
-static void audio_playback_callback(int16_t * buffer, uint16_t num_samples){
-
-    // fill with silence while paused
-    if (audio_output_paused){
-        if (btstack_ring_buffer_bytes_available(&audio_ring_buffer) < audio_prebuffer_bytes){
-            memset(buffer, 0, num_samples * BYTES_PER_FRAME);
-           return;
-        } else {
-            // resume playback
-            audio_output_paused = 0;
-        }
-    }
-
-    // get data from ringbuffer
-    uint32_t bytes_read = 0;
-    btstack_ring_buffer_read(&audio_ring_buffer, (uint8_t *) buffer, num_samples * BYTES_PER_FRAME, &bytes_read);
-    num_samples -= bytes_read / BYTES_PER_FRAME;
-    buffer      += bytes_read / BYTES_PER_FRAME;
-
-    // fill with 0 if not enough
-    if (num_samples)
-    {
-        memset(buffer, 0, num_samples * BYTES_PER_FRAME);
-        audio_output_paused = 1;
-    }
-}
-
 // return 1 if ok
 static int audio_initialize(int sample_rate){
-
-    // -- output -- //
 
     // init buffers
     memset(audio_ring_buffer_storage, 0, sizeof(audio_ring_buffer_storage));
     btstack_ring_buffer_init(&audio_ring_buffer, audio_ring_buffer_storage, sizeof(audio_ring_buffer_storage));
     audio_output_paused  = 1;
 
-    // // config and setup audio playback
-    // const btstack_audio_sink_t * audio_sink = btstack_audio_esp32_sink_get_instance();
-    // if (audio_sink != NULL){
-    //     audio_sink->init(1, sample_rate, &audio_playback_callback);
-    //     audio_sink->start_stream();
-
-    // }
-
-    // -- input -- //
-
-    // // init buffers
-    // memset(audio_ring_buffer_storage, 0, sizeof(audio_ring_buffer_storage));
-    // btstack_ring_buffer_init(&audio_input_ring_buffer, audio_ring_buffer_storage, sizeof(audio_ring_buffer_storage));
-    // audio_input_paused = 1;
-
-// #ifdef USE_AUDIO_INPUT
-//     // config and setup audio recording
-//     const btstack_audio_source_t * audio_source = btstack_audio_esp32_source_get_instance();
-//     if (audio_source != NULL){
-//         audio_source->init(1, sample_rate, &audio_recording_callback);
-//         audio_source->start_stream();
-
-//     }
-// #endif
-
     return 1;
-}
-
-static void audio_terminate(void)
-{
-    const btstack_audio_sink_t * audio_sink = btstack_audio_esp32_sink_get_instance();
-    if (!audio_sink) return;
-    audio_sink->close();
-
-#ifdef USE_AUDIO_INPUT
-    const btstack_audio_source_t * audio_source= btstack_audio_esp32_source_get_instance();
-    if (!audio_source) return;
-    audio_source->close();
-#endif
 }
 
 // CVSD - 8 kHz
@@ -195,8 +116,6 @@ static void cvsd_fill_payload(uint8_t * payload_buffer, uint16_t sco_payload_len
         uint16_t samples_to_copy = sco_payload_length / 2;
         uint32_t bytes_read = 0;
         btstack_ring_buffer_read(&audio_ring_buffer, payload_buffer, bytes_to_copy, &bytes_read);
-        // flip 16 on big endian systems
-        // @note We don't use (uint16_t *) casts since all sample addresses are odd which causes crahses on some systems
         if (btstack_is_big_endian()) {
             uint16_t i;
             for (i=0;i<samples_to_copy/2;i+=2){
@@ -324,6 +243,4 @@ void sco_close(void){
 
     codec_current->close();
     codec_current = NULL;
-
-    audio_terminate();
 }

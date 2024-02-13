@@ -29,20 +29,21 @@
 
 #define PREBUFFER_BYTES_MAX PREBUFFER_BYTES_8KHZ
 #define SAMPLES_PER_FRAME_MAX 60
-
+ 
 static uint16_t              audio_prebuffer_bytes;
 
 // output
 static int                   audio_output_paused  = 0;
-static uint8_t               audio_output_ring_buffer_storage[2 * PREBUFFER_BYTES_MAX];
-static btstack_ring_buffer_t audio_output_ring_buffer;
+static int                   audio_input_paused   = 0;
 
+static uint8_t               audio_ring_buffer_storage[2 * PREBUFFER_BYTES_MAX];
+static btstack_ring_buffer_t audio_ring_buffer;
+ 
 // input
 #define USE_AUDIO_INPUT
 
-static int                   audio_input_paused  = 0;
-static uint8_t               audio_input_ring_buffer_storage[2 * PREBUFFER_BYTES_MAX];
-static btstack_ring_buffer_t audio_input_ring_buffer;
+// static uint8_t               audio_input_ring_buffer_storage[2 * PREBUFFER_BYTES_MAX];
+// static btstack_ring_buffer_t audio_input_ring_buffer;
 
 static int count_sent = 0;
 static int count_received = 0;
@@ -64,19 +65,19 @@ typedef struct {
 // current configuration
 static const codec_support_t * codec_current = NULL;
 
-#ifdef USE_AUDIO_INPUT
-static void audio_recording_callback(const int16_t * buffer, uint16_t num_samples)
-{
-    btstack_ring_buffer_write(&audio_input_ring_buffer, (uint8_t *)buffer, num_samples * 2);
-}
-#endif
+// #ifdef USE_AUDIO_INPUT
+// static void audio_recording_callback(const int16_t * buffer, uint16_t num_samples)
+// {
+//     btstack_ring_buffer_write(&audio_input_ring_buffer, (uint8_t *)buffer, num_samples * 2);
+// } 
+// #endif
 
 // Audio Playback / Recording
 static void audio_playback_callback(int16_t * buffer, uint16_t num_samples){
 
     // fill with silence while paused
     if (audio_output_paused){
-        if (btstack_ring_buffer_bytes_available(&audio_output_ring_buffer) < audio_prebuffer_bytes){
+        if (btstack_ring_buffer_bytes_available(&audio_ring_buffer) < audio_prebuffer_bytes){
             memset(buffer, 0, num_samples * BYTES_PER_FRAME);
            return;
         } else {
@@ -87,7 +88,7 @@ static void audio_playback_callback(int16_t * buffer, uint16_t num_samples){
 
     // get data from ringbuffer
     uint32_t bytes_read = 0;
-    btstack_ring_buffer_read(&audio_output_ring_buffer, (uint8_t *) buffer, num_samples * BYTES_PER_FRAME, &bytes_read);
+    btstack_ring_buffer_read(&audio_ring_buffer, (uint8_t *) buffer, num_samples * BYTES_PER_FRAME, &bytes_read);
     num_samples -= bytes_read / BYTES_PER_FRAME;
     buffer      += bytes_read / BYTES_PER_FRAME;
 
@@ -105,34 +106,34 @@ static int audio_initialize(int sample_rate){
     // -- output -- //
 
     // init buffers
-    memset(audio_output_ring_buffer_storage, 0, sizeof(audio_output_ring_buffer_storage));
-    btstack_ring_buffer_init(&audio_output_ring_buffer, audio_output_ring_buffer_storage, sizeof(audio_output_ring_buffer_storage));
+    memset(audio_ring_buffer_storage, 0, sizeof(audio_ring_buffer_storage));
+    btstack_ring_buffer_init(&audio_ring_buffer, audio_ring_buffer_storage, sizeof(audio_ring_buffer_storage));
+    audio_output_paused  = 1;
 
-    // config and setup audio playback
-    const btstack_audio_sink_t * audio_sink = btstack_audio_esp32_sink_get_instance();
-    if (audio_sink != NULL){
-        audio_sink->init(1, sample_rate, &audio_playback_callback);
-        audio_sink->start_stream();
+    // // config and setup audio playback
+    // const btstack_audio_sink_t * audio_sink = btstack_audio_esp32_sink_get_instance();
+    // if (audio_sink != NULL){
+    //     audio_sink->init(1, sample_rate, &audio_playback_callback);
+    //     audio_sink->start_stream();
 
-        audio_output_paused  = 1;
-    }
+    // }
 
     // -- input -- //
 
-    // init buffers
-    memset(audio_input_ring_buffer_storage, 0, sizeof(audio_input_ring_buffer_storage));
-    btstack_ring_buffer_init(&audio_input_ring_buffer, audio_input_ring_buffer_storage, sizeof(audio_input_ring_buffer_storage));
-    audio_input_paused = 1;
+    // // init buffers
+    // memset(audio_ring_buffer_storage, 0, sizeof(audio_ring_buffer_storage));
+    // btstack_ring_buffer_init(&audio_input_ring_buffer, audio_ring_buffer_storage, sizeof(audio_ring_buffer_storage));
+    // audio_input_paused = 1;
 
-#ifdef USE_AUDIO_INPUT
-    // config and setup audio recording
-    const btstack_audio_source_t * audio_source = btstack_audio_esp32_source_get_instance();
-    if (audio_source != NULL){
-        audio_source->init(1, sample_rate, &audio_recording_callback);
-        audio_source->start_stream();
+// #ifdef USE_AUDIO_INPUT
+//     // config and setup audio recording
+//     const btstack_audio_source_t * audio_source = btstack_audio_esp32_source_get_instance();
+//     if (audio_source != NULL){
+//         audio_source->init(1, sample_rate, &audio_recording_callback);
+//         audio_source->start_stream();
 
-    }
-#endif
+//     }
+// #endif
 
     return 1;
 }
@@ -181,7 +182,7 @@ static void cvsd_receive(const uint8_t * packet, uint16_t size)
     bool bad_frame = (packet[1] & 0x30) != 0;
 
     btstack_cvsd_plc_process_data(&cvsd_plc_state, bad_frame, audio_frame_in, num_samples, audio_frame_out);
-    btstack_ring_buffer_write(&audio_output_ring_buffer, (uint8_t *)audio_frame_out, audio_bytes_read);
+    btstack_ring_buffer_write(&audio_ring_buffer, (uint8_t *)audio_frame_out, audio_bytes_read);
 }
 
 static void cvsd_fill_payload(uint8_t * payload_buffer, uint16_t sco_payload_length)
@@ -193,7 +194,7 @@ static void cvsd_fill_payload(uint8_t * payload_buffer, uint16_t sco_payload_len
     if (!audio_input_paused){
         uint16_t samples_to_copy = sco_payload_length / 2;
         uint32_t bytes_read = 0;
-        btstack_ring_buffer_read(&audio_input_ring_buffer, payload_buffer, bytes_to_copy, &bytes_read);
+        btstack_ring_buffer_read(&audio_ring_buffer, payload_buffer, bytes_to_copy, &bytes_read);
         // flip 16 on big endian systems
         // @note We don't use (uint16_t *) casts since all sample addresses are odd which causes crahses on some systems
         if (btstack_is_big_endian()) {
@@ -291,7 +292,7 @@ void sco_send(hci_con_handle_t sco_handle){
 
     // resume if pre-buffer is filled
     if (audio_input_paused){
-        if (btstack_ring_buffer_bytes_available(&audio_input_ring_buffer) >= audio_prebuffer_bytes){
+        if (btstack_ring_buffer_bytes_available(&audio_ring_buffer) >= audio_prebuffer_bytes){
             // resume sending
             audio_input_paused = 0;
         }

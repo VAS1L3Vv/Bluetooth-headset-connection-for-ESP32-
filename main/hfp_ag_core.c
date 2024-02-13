@@ -28,8 +28,6 @@ static hci_con_handle_t acl_handle = HCI_CON_HANDLE_INVALID;
 static hci_con_handle_t sco_handle = HCI_CON_HANDLE_INVALID;
 static btstack_packet_callback_registration_t hci_event_callback_registration;
 
-static btstack_timer_source_t hfp_outgoing_call_ringing_timer;
-
 static int ag_indicators_nr = 7;
 static hfp_ag_indicator_t ag_indicators[] = {
     // index, name, min range, max range, status, mandatory, enabled, status changed

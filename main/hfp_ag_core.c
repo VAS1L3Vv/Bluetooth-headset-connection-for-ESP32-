@@ -212,6 +212,32 @@ static void report_status(uint8_t status, const char * message){
     }
 }
 
+void sco_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * event, uint16_t event_size)
+{
+    UNUSED(channel);
+    bd_addr_t addr;
+    uint8_t status;
+    switch (packet_type)
+    {
+        case HCI_EVENT_PACKET:
+            switch(hci_event_packet_get_type(event))
+            {
+                case HCI_EVENT_SCO_CAN_SEND_NOW:
+                    sco_send(sco_handle); 
+                    break; 
+                default:
+                    break;
+            }
+        case HCI_SCO_DATA_PACKET:
+            if (READ_SCO_CONNECTION_HANDLE(event) != sco_handle) break;
+            sco_receive(event, event_size);
+            break;
+        default:
+            break;
+
+    }
+}
+
 void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * event, uint16_t event_size)
 {
     UNUSED(channel);
@@ -245,9 +271,6 @@ void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * event, uint
                 case GAP_EVENT_INQUIRY_COMPLETE:
                     printf("Inquiry scan complete.\n");
                     break;
-                case HCI_EVENT_SCO_CAN_SEND_NOW:
-                    sco_send(sco_handle); 
-                    break; 
                 default:
                     break;
             }
@@ -390,11 +413,6 @@ void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * event, uint
                     break;
             }
             break;
-            
-        case HCI_SCO_DATA_PACKET:
-            if (READ_SCO_CONNECTION_HANDLE(event) != sco_handle) break;
-            sco_receive(event, event_size);
-            break;
         default:
             break;
     }
@@ -453,7 +471,7 @@ int btstack_main(int argc, const char * argv[])
     // register for HCI events and SCO packets
     hci_event_callback_registration.callback = &packet_handler;
     hci_add_event_handler(&hci_event_callback_registration);
-    hci_register_sco_packet_handler(&packet_handler);
+    hci_register_sco_packet_handler(&sco_packet_handler);
 
     // register for HFP events
     hfp_ag_register_packet_handler(&packet_handler); 

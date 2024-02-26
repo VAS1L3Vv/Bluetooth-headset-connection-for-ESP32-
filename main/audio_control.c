@@ -17,9 +17,6 @@
 #define SCO_REPORT_PERIOD           100
 
 // constants
-#define NUM_CHANNELS            1
-#define SAMPLE_RATE_8KHZ        8000
-#define BYTES_PER_FRAME         2
 #define REFILL_SAMPLES          16 // проверка и запись в буффер передачи по 16 элементов
 
 // audio pre-buffer - also defines latency

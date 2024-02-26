@@ -12,13 +12,13 @@ static void show_usage(void){
     // соъздадим базу даннных макс. из 10 устройств для подключения 
     printf("2 - establish HFP connection %s\n", bd_addr_to_str(device_addr));
     printf("3 - release HFP connection\n");
-    printf("4 - establish audio connection\n");
-    printf("5 - release audio connection\n");
-    printf("6 - record headset microphone\n");
-    printf("7 - playback recorded audio\n");
-    printf("8 - toggle proccessing with codec2\n");
-    printf("9 - abort voice n clear buffer\n");
-    printf("0 - report status \n\n\n");
+    // printf("4 - establish audio connection\n");
+    // printf("5 - release audio connection\n");
+    printf("4 - record headset microphone for 10 seconds\n");
+    printf("5 - playback recorded audio\n");
+    printf("6 - toggle proccessing with codec2\n");
+    printf("7 - abort voice and clear buffer\n");
+    printf("8 - report status \n\n\n");
     printf("a - report AG failure\n");
     printf("b - delete all link keys\n");
     printf("c - Set signal strength to 0            | C - Set signal strength to 5\n");
@@ -49,28 +49,37 @@ void stdin_process(char cmd){
             printf("Release HFP service level connection.\n");
             status = hfp_ag_release_service_level_connection(acl_handle);
             break;
+        // case '4':
+        //     log_info("USER:\'%c\'", cmd);
+        //     printf("Establish Audio connection %s...\n", bd_addr_to_str(device_addr));
+        //     status = hfp_ag_establish_audio_connection(acl_handle);
+        //     break;
+        // case '5':
+        //     log_info("USER:\'%c\'", cmd);
+        //     printf("Release Audio connection.\n");
+        //     status = hfp_ag_release_audio_connection(acl_handle);
+        //     break;
         case '4':
             log_info("USER:\'%c\'", cmd);
-            printf("Establish Audio connection %s...\n", bd_addr_to_str(device_addr));
-            status = hfp_ag_establish_audio_connection(acl_handle);
+            
+            bytes_recieved = record_bt_microphone(audio_buff, AUDIO_SECONDS);
             break;
         case '5':
             log_info("USER:\'%c\'", cmd);
-            printf("Release Audio connection.\n");
-            status = hfp_ag_release_audio_connection(acl_handle);
-            break;
-        case '6':
-            log_info("USER:\'%c\'", cmd);
-            bytes_recieved = record_bt_mic(audio_buff, secs);
-            break;
-        case '7':
-            log_info("USER:\'%c\'", cmd);
-            bytes_sent = playback_to_speaker();
+            bytes_sent = playback_to_speaker(audio_buff, AUDIO_SECONDS);
             break;    
-        case '8':
+        case '6':
             log_info("USER:\'%c\'", cmd);
             toggle_codec2();
             break;
+        case '7':
+            log_info("USER:\'%c\'", cmd);
+            abort_audio();
+            printf("Stopped audio. Cleared buffers. \n Press 6 to record again. \n");
+            break;
+        case '8':
+            log_info("USER:\'%c\'", cmd);
+            report_audio_status();
         case 'a':
             log_info("USER:\'%c\'", cmd);
             printf("Report AG failure\n");
@@ -168,7 +177,7 @@ void sco_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * event, 
     UNUSED(channel);
     switch (packet_type)
     {
-        if(sco_conn_state == SENDING_PACKET)
+        if(audio_handle->sco_conn_state == SENDING_PACKET) {
         case HCI_EVENT_PACKET:
             switch(hci_event_packet_get_type(event))
             {
@@ -178,14 +187,15 @@ void sco_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * event, 
                 default:
                     break;
             }
-        if(sco_conn_state == RECIEVING_PACKET)
+        }
+        if(audio_handle->sco_conn_state == RECIEVING_PACKET) {
         case HCI_SCO_DATA_PACKET:
             if (READ_SCO_CONNECTION_HANDLE(event) != sco_handle) break;
             sco_receive(event, event_size);
             break;
         default:
             break;
-
+        }
     }
 }
 

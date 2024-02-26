@@ -7,6 +7,10 @@
 extern "C" {
 #endif
 
+#define NUM_CHANNELS            1
+#define SAMPLE_RATE_8KHZ        8000
+#define BYTES_PER_FRAME         2
+
 /**
  * @brief Init demo SCO data production/consumtion
  */

@@ -12,6 +12,7 @@
         "btstack_audio.h": "c",
         "btstack_cvsd_plc.h": "c",
         "audio_control.h": "c",
-        "btstack_ring_buffer.h": "c"
+        "btstack_ring_buffer.h": "c",
+        "hfp_ag_core.h": "c"
     }
 }

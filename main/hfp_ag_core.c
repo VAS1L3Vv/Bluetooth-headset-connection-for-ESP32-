@@ -1,63 +1,7 @@
 #define BTSTACK_FILE__ "hfp_ag.c"
+#include "hfp_ag_core.h"
+#include "bt_audio_handler.h"
 
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include "btstack.h"
-#include "audio_control.h"
-#include "btstack_config.h"
-#ifdef HAVE_BTSTACK_STDIN
-#include "btstack_stdin.h"
-#endif
-
-#define MAX_BUFFER_SIZE_BYTES 960000
-#define INQUIRY_INTERVAL 10
-
-uint8_t hfp_service_buffer[150];
-const uint8_t    rfcomm_channel_nr = 1;
-const char hfp_ag_service_name[] = "HFP AG Demo";
-
-static bd_addr_t device_addr;
-static const char * device_addr_string = "A1:2A:A9:B0:AD:31";
-
-static uint8_t codecs[] = {HFP_CODEC_CVSD};
-static uint8_t negotiated_codec = HFP_CODEC_CVSD;
-static hci_con_handle_t acl_handle = HCI_CON_HANDLE_INVALID;
-static hci_con_handle_t sco_handle = HCI_CON_HANDLE_INVALID;
-static btstack_packet_callback_registration_t hci_event_callback_registration;
-
-static int ag_indicators_nr = 7;
-static hfp_ag_indicator_t ag_indicators[] = {
-    // index, name, min range, max range, status, mandatory, enabled, status changed
-    {1, "service",   0, 1, 1, 0, 0, 0},
-    {2, "call",      0, 1, 0, 1, 1, 0},
-    {3, "callsetup", 0, 3, 0, 1, 1, 0},
-    {4, "battchg",   0, 5, 3, 0, 0, 0},
-    {5, "signal",    0, 5, 5, 0, 1, 0},
-    {6, "roam",      0, 1, 0, 0, 1, 0},
-    {7, "callheld",  0, 2, 0, 1, 1, 0}
-};
-
-static int call_hold_services_nr = 5;
-static const char* call_hold_services[] = {"1", "1x", "2", "2x", "3"};
-
-static int hf_indicators_nr = 2;
-static hfp_generic_status_indicator_t hf_indicators[] = {
-    {1, 1},
-    {2, 1},
-};
-
-static hfp_phone_number_t subscriber_number = { 129, "225577"};
-static hfp_voice_recognition_message_t msg = {
-    0xABCD, HFP_TEXT_TYPE_MESSAGE_FROM_AG, HFP_TEXT_OPERATION_REPLACE, "The temperature in Munich is 30 degrees."
-};
-
-enum STATE {INIT, W4_INQUIRY_MODE_COMPLETE, ACTIVE} ;
-enum STATE state = INIT;
-
-#ifdef HAVE_BTSTACK_STDIN
 // Testig User Interface 
 static void show_usage(void){
     bd_addr_t iut_address;
@@ -72,8 +16,9 @@ static void show_usage(void){
     printf("5 - release audio connection\n");
     printf("6 - record headset microphone\n");
     printf("7 - playback recorded audio\n");
-    printf("8 - playback codec2 audio\n");
-    printf("9 - abort voice n clear buffer\n\n\n");
+    printf("8 - toggle proccessing with codec2\n");
+    printf("9 - abort voice n clear buffer\n");
+    printf("0 - report status \n\n\n");
     printf("a - report AG failure\n");
     printf("b - delete all link keys\n");
     printf("c - Set signal strength to 0            | C - Set signal strength to 5\n");
@@ -114,10 +59,18 @@ void stdin_process(char cmd){
             printf("Release Audio connection.\n");
             status = hfp_ag_release_audio_connection(acl_handle);
             break;
-        // case '6':
-        //     log_info("USER:\'%c\'", cmd);
-        //     bytes_read = record_bt_mic(audio_buff, secs);
-        //     break;
+        case '6':
+            log_info("USER:\'%c\'", cmd);
+            bytes_recieved = record_bt_mic(audio_buff, secs);
+            break;
+        case '7':
+            log_info("USER:\'%c\'", cmd);
+            bytes_sent = playback_to_speaker();
+            break;    
+        case '8':
+            log_info("USER:\'%c\'", cmd);
+            toggle_codec2();
+            break;
         case 'a':
             log_info("USER:\'%c\'", cmd);
             printf("Report AG failure\n");
@@ -202,8 +155,6 @@ void stdin_process(char cmd){
     }
 }
 
-#endif
-
 static void report_status(uint8_t status, const char * message){
     if (status != ERROR_CODE_SUCCESS){
         printf("%s command failed, status 0x%02x\n", message, status);
@@ -215,10 +166,9 @@ static void report_status(uint8_t status, const char * message){
 void sco_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * event, uint16_t event_size)
 {
     UNUSED(channel);
-    bd_addr_t addr;
-    uint8_t status;
     switch (packet_type)
     {
+        if(sco_conn_state == SENDING_PACKET)
         case HCI_EVENT_PACKET:
             switch(hci_event_packet_get_type(event))
             {
@@ -228,6 +178,7 @@ void sco_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * event, 
                 default:
                     break;
             }
+        if(sco_conn_state == RECIEVING_PACKET)
         case HCI_SCO_DATA_PACKET:
             if (READ_SCO_CONNECTION_HANDLE(event) != sco_handle) break;
             sco_receive(event, event_size);

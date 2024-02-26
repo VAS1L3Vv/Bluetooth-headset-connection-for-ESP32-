@@ -13,18 +13,33 @@ void report_status()
         printf("\nMode: Sending audio to speaker.\n");
     if(audio_handle->sco_conn_state == RECIEVING_PACKET)
         printf("Mode: recording microphone.");
-        
-    
-
+    if(audio_handle->audio_buffer) {
+        printf("Audio buffer initialized. \n");
+        printf("Buffer size in bytes:\t %d", sizeof(*(audio_handle->audio_buffer))); 
+        printf("Equvilent to: %d seconds", sizeof(*(audio_handle->audio_buffer))/SAMPLE_RATE_8KHZ/BYTES_PER_SAMPLE);
+        printf("Expected buffer size: %i",audio_handle->buffer_byte_size);
+    }
+    else
+        printf("Audio buffer NOT initialiazed. \n");
+    if(codec2_enabled)
+        printf("Codec2 processing ENABLED. \n");
+    else
+        printf("Codec2 processing DISABLED. \n");
+    if(audio_handle->record_cycle == 0)
+        printf("Nothing recorded yet. Press 4 to record voice audio. \n");
+    else
+        printf("Record cycle: currently on %d \n");
 }
 void toggle_codec2() // вкл-выкл обработки буффера с кодек2
 {
     if(codec2_enabled) {
         set_codec2_state(OFF); // выключает кодек2 если прежде был включен
-        printf("Codec2 proccessing has been disabled \n ");
+        printf("Codec2 processing has been disabled \n ");
         return;
     }
-    else set_codec2_state(ON); // включает кодек2 если прежде был выключен
+    else {
+        set_codec2_state(ON); // включает кодек2 если прежде был выключен
+        printf("Codec2 processing has been enabled \n ");
         return;
 }
 

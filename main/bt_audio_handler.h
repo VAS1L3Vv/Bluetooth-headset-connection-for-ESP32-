@@ -11,10 +11,10 @@
 #include "btstack_config.h"
 #include "btstack_stdin.h"
 
-#define SENDING_PACKET 0
-#define RECIEVING_PACKET 1
-#define ON 0 
-#define OFF 1
+#define LISTENING 0
+#define RECORDING 1
+#define OFF 0
+#define ON 1
 #define AUDIO_SECONDS 10
 #define BYTES_PER_SAMPLE 2
 #define SECONDS_TO_BYTES AUDIO_SECONDS*BYTES_PER_SAMPLE*SAMPLE_RATE_8KHZ
@@ -25,20 +25,32 @@
 
 typedef struct {
 
-    bool sco_conn_state;
     int16_t * audio_buffer;
     int buffer_byte_size;
     bool codec2_enabled;
-    int record_cycle;
+    int record_cycle_num;
+    int playback_cycle_num;
+    bool sco_conn_state;
 
 } audio_struct_t;
 
-audio_struct_t * audio_handle = NULL;
+static audio_struct_t audio_struct = {
+        .audio_buffer = NULL,
+        .buffer_byte_size = 0,
+        .codec2_enabled = OFF,
+        .record_cycle_num = 0,
+        .playback_cycle_num = 0,
+        .sco_conn_state = LISTENING, // при инициализации стоит в режиме "прослушивания" пакетов
+    }; // изначальные данные
 
-void report_status();
+static audio_struct_t * audio_handle = &audio_struct;
+
+bool current_bt_mode();
+void report_audio_status();
 void toggle_codec2();
-void record_bt_microphone(int16_t audio_buffer, int bytes);
-int playback_bt_speaker(int16_t audio_buffer, int bytes);
-void abort_audio();
-audio_struct_t *audio_handle_init(int16_t *buffer_ptr, int byte_size);
+void record_bt_microphone(hci_con_handle_t acl_handle, int16_t * audio_buffer, int buf_size);
+void playback_bt_speaker(hci_con_handle_t acl_handle, int16_t * audio_buffer, int bytes);
+void abort_audio(hci_con_handle_t acl_handle);
+void setup_audio(int16_t *buffer_ptr, int byte_size);
+
 #endif

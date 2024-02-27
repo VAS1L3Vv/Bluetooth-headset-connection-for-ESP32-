@@ -20,6 +20,8 @@ const char hfp_ag_service_name[] = "HFP AG Demo";
 static bd_addr_t device_addr;
 static const char * device_addr_string = "A1:2A:A9:B0:AD:31";
 
+static int16_t * audio_buff;
+
 static uint8_t codecs[] = {HFP_CODEC_CVSD};
 static uint8_t negotiated_codec = HFP_CODEC_CVSD;
 static hci_con_handle_t acl_handle = HCI_CON_HANDLE_INVALID;

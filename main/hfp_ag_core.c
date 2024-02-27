@@ -61,20 +61,19 @@ void stdin_process(char cmd){
         //     break;
         case '4':
             log_info("USER:\'%c\'", cmd);
-            
-            bytes_recieved = record_bt_microphone(audio_buff, AUDIO_SECONDS);
+            record_bt_microphone(acl_handle, audio_buff, AUDIO_SECONDS);
             break;
         case '5':
             log_info("USER:\'%c\'", cmd);
-            bytes_sent = playback_to_speaker(audio_buff, AUDIO_SECONDS);
-            break;    
+            playback_bt_speaker(acl_handle, audio_buff, AUDIO_SECONDS);
+            break;
         case '6':
             log_info("USER:\'%c\'", cmd);
             toggle_codec2();
             break;
         case '7':
             log_info("USER:\'%c\'", cmd);
-            abort_audio();
+            abort_audio(acl_handle);
             printf("Stopped audio. Cleared buffers. \n Press 6 to record again. \n");
             break;
         case '8':
@@ -177,7 +176,7 @@ void sco_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * event, 
     UNUSED(channel);
     switch (packet_type)
     {
-        if(audio_handle->sco_conn_state == SENDING_PACKET) {
+        if(current_bt_mode() == LISTENING)
         case HCI_EVENT_PACKET:
             switch(hci_event_packet_get_type(event))
             {
@@ -187,15 +186,14 @@ void sco_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * event, 
                 default:
                     break;
             }
-        }
-        if(audio_handle->sco_conn_state == RECIEVING_PACKET) {
+        
+        if(current_bt_mode() == RECORDING) 
         case HCI_SCO_DATA_PACKET:
             if (READ_SCO_CONNECTION_HANDLE(event) != sco_handle) break;
             sco_receive(event, event_size);
             break;
         default:
             break;
-        }
     }
 }
 
@@ -446,7 +444,5 @@ int btstack_main(int argc, const char * argv[])
 #endif  
     // turn on!
     hci_power_control(HCI_POWER_ON);
-
-    printf("BT device started. Ready to operate.");
     return 0;
 }

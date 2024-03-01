@@ -31,7 +31,7 @@ static void show_usage(void){
     printf("---\n");
 }
 
-void stdin_process(char cmd){
+void stdin_process(char cmd) {
     uint8_t status = ERROR_CODE_SUCCESS;
 
     switch (cmd){
@@ -61,11 +61,13 @@ void stdin_process(char cmd){
         //     break;
         case '4':
             log_info("USER:\'%c\'", cmd);
-            record_bt_microphone(acl_handle, audio_buff, AUDIO_SECONDS);
+            record_bt_microphone(acl_handle);
+            report_audio_status();
             break;
         case '5':
             log_info("USER:\'%c\'", cmd);
-            playback_bt_speaker(acl_handle, audio_buff, AUDIO_SECONDS);
+            playback_bt_speaker(acl_handle);
+            report_audio_status();
             break;
         case '6':
             log_info("USER:\'%c\'", cmd);
@@ -431,7 +433,6 @@ int btstack_main(int argc, const char * argv[])
     hci_event_callback_registration.callback = &packet_handler;
     hci_add_event_handler(&hci_event_callback_registration);
     hci_register_sco_packet_handler(&sco_packet_handler);
-
     // register for HFP events
     hfp_ag_register_packet_handler(&packet_handler); 
     // функция пакет хандлер так же является управляющей SCO пакетами
@@ -444,5 +445,9 @@ int btstack_main(int argc, const char * argv[])
 #endif  
     // turn on!
     hci_power_control(HCI_POWER_ON);
+    
+    printf("\n\nFirst time init. Allocating buffers for %d second sound. \n\n", SECONDS_TO_BYTES);
+    report_audio_status();   
+
     return 0;
 }

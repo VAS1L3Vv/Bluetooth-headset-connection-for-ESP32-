@@ -7,40 +7,29 @@
 #include "classic/btstack_cvsd_plc.h"
 #include "classic/btstack_sbc.h"
 #include "classic/hfp.h"
-
-#ifdef _MSC_VER
-// ignore deprecated warning for fopen
-#pragma warning(disable : 4996)
-#endif
+#include "bt_audio_handler.h"
 
 // number of sco packets until 'report' on console
 #define SCO_REPORT_PERIOD           100
-
 // constants
 #define REFILL_SAMPLES          16 // проверка и запись в буффер передачи по 16 элементов
-
 // audio pre-buffer - also defines latency
 #define SCO_PREBUFFER_MS      50
 #define PREBUFFER_BYTES_8KHZ  (SCO_PREBUFFER_MS *  SAMPLE_RATE_8KHZ/1000 * BYTES_PER_FRAME)
-
 #define PREBUFFER_BYTES_MAX PREBUFFER_BYTES_8KHZ
 #define SAMPLES_PER_FRAME_MAX 60
- 
 static uint16_t              audio_prebuffer_bytes;
 
 // output
 static int                   audio_output_paused  = 0;
 static int                   audio_input_paused   = 0;
-
 static uint8_t               audio_ring_buffer_storage[2 * PREBUFFER_BYTES_MAX];
 static btstack_ring_buffer_t audio_ring_buffer;
  
 // input
 #define USE_AUDIO_INPUT
-
 static int count_sent = 0;
 static int count_received = 0;
-
 static btstack_cvsd_plc_state_t cvsd_plc_state;
 
 int num_samples_to_write;
@@ -55,32 +44,43 @@ typedef struct {
     uint16_t sample_rate;
 } codec_support_t;
 
+static audio_struct_t audio_data = {
+        .mic_buff = NULL,
+        .spkr_buff = NULL,
+        .buf_size = 0,
+        .buf_length = 0,
+        .buf_time = 0,
+        .rb_size = 0,
+        .rb_length = 0,
+        .rb_time = 0,
+        .rb_coef = 1.5,
+        .codec2_enabled = OFF,
+        .record_cycle_num = 0,
+        .playback_cycle_num = 0,
+        .sco_conn_state = LISTENING, // при инициализации стоит в режиме "прослушивания" пакетов
+    }; // изначальные данные
+
 // current configuration
 static const codec_support_t * codec_current = NULL;
+// static const audio_struct_t * audio_handle = get_audio_handle();
 
 // return 1 if ok
-static int audio_initialize(int sample_rate){
-
+static int audio_initialize(int sample_rate) {
     // init buffers
     memset(audio_ring_buffer_storage, 0, sizeof(audio_ring_buffer_storage));
     btstack_ring_buffer_init(&audio_ring_buffer, audio_ring_buffer_storage, sizeof(audio_ring_buffer_storage));
     audio_output_paused  = 1;
-
     return 1;
 }
 
 // CVSD - 8 kHz
-static void cvsd_init(void)
-{ 
+static void cvsd_init(void) { 
     printf("SCO Demo: Init CVSD\n");
     btstack_cvsd_plc_init(&cvsd_plc_state);
 }
 
-static void cvsd_receive(const uint8_t * packet, uint16_t size)
-{
-
+static void cvsd_receive(const uint8_t * packet, uint16_t size) {
     int16_t audio_frame_out[128];
-
     if (size > sizeof(audio_frame_out)){
         printf("cvsd_receive: SCO packet larger than local output buffer - dropping data.\n");
         return;
@@ -98,15 +98,12 @@ static void cvsd_receive(const uint8_t * packet, uint16_t size)
 
     // treat packet as bad frame if controller does not report 'all good'
     bool bad_frame = (packet[1] & 0x30) != 0;
-
     btstack_cvsd_plc_process_data(&cvsd_plc_state, bad_frame, audio_frame_in, num_samples, audio_frame_out);
     btstack_ring_buffer_write(&audio_ring_buffer, (uint8_t *)audio_frame_out, audio_bytes_read);
 }
 
-static void cvsd_fill_payload(uint8_t * payload_buffer, uint16_t sco_payload_length)
-{
+static void cvsd_fill_payload(uint8_t * payload_buffer, uint16_t sco_payload_length) {
     uint16_t bytes_to_copy = sco_payload_length;
-
     // get data from ringbuffer
     uint16_t pos = 0;
     if (!audio_input_paused){
@@ -124,7 +121,6 @@ static void cvsd_fill_payload(uint8_t * payload_buffer, uint16_t sco_payload_len
         bytes_to_copy -= bytes_read;
         pos           += bytes_read;
     }
-
     // fill with 0 if not enough
     if (bytes_to_copy){
         memset(payload_buffer + pos, 0, bytes_to_copy);
@@ -132,8 +128,7 @@ static void cvsd_fill_payload(uint8_t * payload_buffer, uint16_t sco_payload_len
     }
 }
 
-static void cvsd_close(void)
-{ 
+static void cvsd_close(void) { 
     printf("Used CVSD with PLC, number of proccesed frames: \n - %d good frames, \n - %d bad frames.\n", cvsd_plc_state.good_frames_nr, cvsd_plc_state.bad_frames_nr);
 }
 
@@ -167,11 +162,8 @@ void sco_set_codec(uint8_t negotiated_codec)
             btstack_assert(false);
             break;
     }
-
     codec_current->init();
-
     audio_initialize(codec_current->sample_rate);
-
     audio_prebuffer_bytes = SCO_PREBUFFER_MS * (codec_current->sample_rate/1000) * BYTES_PER_FRAME;
 }
 
@@ -235,9 +227,7 @@ void sco_send(hci_con_handle_t sco_handle){
 
 void sco_close(void){
     printf("SCO demo close\n");
-
     printf("SCO demo statistics: ");
-
     codec_current->close();
     codec_current = NULL;
 }

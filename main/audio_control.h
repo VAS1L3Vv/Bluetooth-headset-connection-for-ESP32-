@@ -11,6 +11,25 @@ extern "C" {
 #define SAMPLE_RATE_8KHZ        8000
 #define BYTES_PER_FRAME         2
 
+#define ON 1
+#define OFF 0
+
+#define AUDIO_SECONDS 10
+
+#define BYTES_PER_SAMPLE 2
+#define SECONDS_TO_BYTES AUDIO_SECONDS*BYTES_PER_SAMPLE*SAMPLE_RATE_8KHZ
+#define MAX_BUFFER_SIZE_BYTES SECONDS_TO_BYTES*2 // maximum rb size = double 160k to avoid overflow
+#define CODEC2_FRAME_SIZE 320
+#define FRAME_SIZE CODEC2_FRAME_SIZE
+#define FRAME_LENGTH FRAME_SIZE/BYTES_PER_SAMPLE
+#define NUMBER_OF_FRAMES SECONDS_TO_BYTES / FRAME_SIZE
+
+#define LISTENING 0 
+#define RECORDING 1
+
+bool connection_mode = LISTENING;
+int cycle_number = 0;
+
 /**
  * @brief Init demo SCO data production/consumtion
  */

@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include "audio_control.h"
+#include "audio_driver.h"
 #include "btstack_debug.h"
 #include "btstack_ring_buffer.h"
 #include "classic/btstack_cvsd_plc.h"
@@ -14,7 +15,7 @@
 // constants
 #define REFILL_SAMPLES          16 // проверка и запись в буффер передачи по 16 элементов
 // audio pre-buffer - also defines latency
-#define SCO_PREBUFFER_MS      50
+#define SCO_PREBUFFER_MS      20
 #define PREBUFFER_BYTES_8KHZ  (SCO_PREBUFFER_MS *  SAMPLE_RATE_8KHZ/1000 * BYTES_PER_FRAME)
 #define PREBUFFER_BYTES_MAX PREBUFFER_BYTES_8KHZ
 #define SAMPLES_PER_FRAME_MAX 60
@@ -23,7 +24,7 @@ static uint16_t              audio_prebuffer_bytes;
 // output
 static int                   audio_output_paused  = 0;
 static int                   audio_input_paused   = 0;
-static uint8_t               audio_ring_buffer_storage[2 * PREBUFFER_BYTES_MAX];
+static uint8_t               audio_ring_buffer_storage[MAX_BUFFER_SIZE_BYTES]; // указатель памяти кольцевого буффера
 static btstack_ring_buffer_t audio_ring_buffer;
  
 // input
@@ -66,7 +67,6 @@ static const codec_support_t * codec_current = NULL;
 
 // return 1 if ok
 static int audio_initialize(int sample_rate) {
-    // init buffers
     memset(audio_ring_buffer_storage, 0, sizeof(audio_ring_buffer_storage));
     btstack_ring_buffer_init(&audio_ring_buffer, audio_ring_buffer_storage, sizeof(audio_ring_buffer_storage));
     audio_output_paused  = 1;
@@ -194,7 +194,7 @@ void sco_send(hci_con_handle_t sco_handle){
 
     int sco_packet_length = hci_get_sco_packet_length();
     int sco_payload_length = sco_packet_length - 3;
-
+    printf("sco payload length: &d", sco_payload_length);
     hci_reserve_packet_buffer(); // подготовка к отправке пакета
     uint8_t * sco_packet = hci_get_outgoing_packet_buffer(); // получаем указатель на передаваемый sco пакет
 

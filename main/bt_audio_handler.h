@@ -5,25 +5,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include "btstack.h"
-#include "audio_control.h"
 #include "btstack_config.h"
 #include "btstack_stdin.h"
-
-#define RECORDING 1
-#define LISTENING 0
-#define ON 1
-#define OFF 0
-#define AUDIO_SECONDS 10
-#define BYTES_PER_SAMPLE 2
-#define SECONDS_TO_BYTES AUDIO_SECONDS*BYTES_PER_SAMPLE*SAMPLE_RATE_8KHZ
-#define MAX_BUFFER_SIZE_BYTES SECONDS_TO_BYTES*2 // maximum rb size = double 160k to avoid overflow
-#define CODEC2_FRAME_SIZE 320
-#define FRAME_SIZE CODEC2_FRAME_SIZE
-#define FRAME_LENGTH FRAME_SIZE/BYTES_PER_SAMPLE
-#define NUMBER_OF_FRAMES SECONDS_TO_BYTES / FRAME_SIZE
-
 typedef struct {
     int16_t * mic_buff;
     int16_t * spkr_buff;

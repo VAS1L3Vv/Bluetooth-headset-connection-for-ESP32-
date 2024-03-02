@@ -15,33 +15,6 @@
 
 #define LOG_TAG "AUDIO"
 
-#ifdef CONFIG_ESP_LYRAT_V4_3_BOARD
-#include "driver/i2c.h"
-#include "es8388.h"
-#define IIC_DATA                    (GPIO_NUM_18)
-#define IIC_CLK                     (GPIO_NUM_23)
-#endif
-
-#if CONFIG_IDF_TARGET_ESP32C3
-// Arbitrary choice - Strapping Pins 2,8,9 are used as outputs
-#define BTSTACK_AUDIO_I2S_BCK GPIO_NUM_2
-#define BTSTACK_AUDIO_I2S_WS  GPIO_NUM_8
-#define BTSTACK_AUDIO_I2S_OUT GPIO_NUM_9
-#define BTSTACK_AUDIO_I2S_IN  GPIO_NUM_10
-#elif CONFIG_IDF_TARGET_ESP32S3
-// ESP32-S3-Korvo-2 V3.0
-#define BTSTACK_AUDIO_I2S_BCK GPIO_NUM_9
-#define BTSTACK_AUDIO_I2S_WS  GPIO_NUM_45
-#define BTSTACK_AUDIO_I2S_OUT GPIO_NUM_8
-#define BTSTACK_AUDIO_I2S_IN  GPIO_NUM_10
-#else
-// ESP32-LyraT V4
-#define BTSTACK_AUDIO_I2S_BCK GPIO_NUM_5
-#define BTSTACK_AUDIO_I2S_WS  GPIO_NUM_25
-#define BTSTACK_AUDIO_I2S_OUT GPIO_NUM_26
-#define BTSTACK_AUDIO_I2S_IN  GPIO_NUM_35
-#endif
-
 // prototypes
 static void btstack_audio_esp32_sink_fill_buffer(void);
 static void btstack_audio_esp32_source_process_buffer(void);

@@ -1,6 +1,5 @@
 #define BTSTACK_FILE__ "hfp_ag.c"
 #include "hfp_ag_core.h"
-#include "bt_audio_handler.h"
 
 // Testig User Interface 
 static void show_usage(void){
@@ -31,6 +30,25 @@ static void show_usage(void){
     printf("---\n");
 }
 
+static uint8_t record_bt_microphone(hci_con_handle_t acl_handle)
+{
+    set_bt_mode(RECORDING);
+    uint8_t stat = hfp_ag_establish_audio_connection(acl_handle);
+    return stat;
+    // audio_handle->record_cycle_num++; // AT THE VERY END
+
+}
+
+static uint8_t playback_bt_speaker(hci_con_handle_t acl_handle) 
+{
+    if(cycle_number == 0) {
+        printf("Nothing recorded yet. Press 4 to record voice audio. \n");
+        return; }
+    set_bt_mode(LISTENING);
+     uint8_t stat = hfp_ag_establish_audio_connection(acl_handle);
+    return stat;
+}
+
 void stdin_process(char cmd) {
     uint8_t status = ERROR_CODE_SUCCESS;
 
@@ -49,25 +67,25 @@ void stdin_process(char cmd) {
             printf("Release HFP service level connection.\n");
             status = hfp_ag_release_service_level_connection(acl_handle);
             break;
-        // case '4':
-        //     log_info("USER:\'%c\'", cmd);
-        //     printf("Establish Audio connection %s...\n", bd_addr_to_str(device_addr));
-        //     status = hfp_ag_establish_audio_connection(acl_handle);
-        //     break;
-        // case '5':
-        //     log_info("USER:\'%c\'", cmd);
-        //     printf("Release Audio connection.\n");
-        //     status = hfp_ag_release_audio_connection(acl_handle);
-        //     break;
+        case '9':
+            log_info("USER:\'%c\'", cmd);
+            printf("Establish Audio connection %s...\n", bd_addr_to_str(device_addr));
+            status = hfp_ag_establish_audio_connection(acl_handle);
+            break;
+        case '0':
+            log_info("USER:\'%c\'", cmd);
+            printf("Release Audio connection.\n");
+            status = hfp_ag_release_audio_connection(acl_handle);
+            break;
         case '4':
             log_info("USER:\'%c\'", cmd);
-            record_bt_microphone(acl_handle);
-            report_audio_status();
+            status = record_bt_microphone(acl_handle);
+            // report_audio_status();
             break;
         case '5':
             log_info("USER:\'%c\'", cmd);
-            playback_bt_speaker(acl_handle);
-            report_audio_status();
+            status = playback_bt_speaker(acl_handle);
+            // report_audio_status();
             break;
         case '6':
             log_info("USER:\'%c\'", cmd);
@@ -178,7 +196,7 @@ void sco_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * event, 
     UNUSED(channel);
     switch (packet_type)
     {
-        if(current_bt_mode() == LISTENING)
+        if(connection_mode == LISTENING)
         case HCI_EVENT_PACKET:
             switch(hci_event_packet_get_type(event))
             {
@@ -189,7 +207,7 @@ void sco_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * event, 
                     break;
             }
         
-        if(current_bt_mode() == RECORDING) 
+        if(connection_mode == RECORDING) 
         case HCI_SCO_DATA_PACKET:
             if (READ_SCO_CONNECTION_HANDLE(event) != sco_handle) break;
             sco_receive(event, event_size);

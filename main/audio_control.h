@@ -18,7 +18,7 @@ extern "C" {
 
 #define BYTES_PER_SAMPLE 2
 #define SECONDS_TO_BYTES AUDIO_SECONDS*BYTES_PER_SAMPLE*SAMPLE_RATE_8KHZ
-#define MAX_BUFFER_SIZE_BYTES SECONDS_TO_BYTES*2 // maximum rb size = double 160k to avoid overflow
+#define MAX_BUFFER_SIZE_BYTES SECONDS_TO_BYTES // maximum rb size = double 160k to avoid overflow
 #define CODEC2_FRAME_SIZE 320
 #define FRAME_SIZE CODEC2_FRAME_SIZE
 #define FRAME_LENGTH FRAME_SIZE/BYTES_PER_SAMPLE
@@ -28,6 +28,7 @@ extern "C" {
 #define RECORDING 1
 
 bool connection_mode = LISTENING;
+bool is_codec2_on = OFF;
 int cycle_number = 0;
 
 /**

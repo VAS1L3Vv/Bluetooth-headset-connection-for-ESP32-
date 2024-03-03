@@ -2,7 +2,6 @@
 
 #include <stdio.h>
 #include "audio_control.h"
-#include "audio_driver.h"
 #include "btstack_debug.h"
 #include "btstack_ring_buffer.h"
 #include "classic/btstack_cvsd_plc.h"
@@ -142,7 +141,6 @@ static const codec_support_t codec_cvsd = {
 
 void sco_init(void)
 {
-
 #ifdef ENABLE_CLASSIC_LEGACY_CONNECTIONS_FOR_SCO_DEMOS
     printf("Disable BR/EDR Secure Connections due to incompatibilities with SCO connections\n");
     gap_secure_connections_enable(false);
@@ -194,7 +192,7 @@ void sco_send(hci_con_handle_t sco_handle){
 
     int sco_packet_length = hci_get_sco_packet_length();
     int sco_payload_length = sco_packet_length - 3;
-    printf("sco payload length: &d", sco_payload_length);
+    printf("sco payload length: %d", sco_payload_length);
     hci_reserve_packet_buffer(); // подготовка к отправке пакета
     uint8_t * sco_packet = hci_get_outgoing_packet_buffer(); // получаем указатель на передаваемый sco пакет
 

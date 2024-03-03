@@ -30,6 +30,10 @@ static void show_usage(void){
     printf("---\n");
 }
 
+static void set_bt_mode(bool mode) {
+    connection_mode = mode;
+}
+
 static uint8_t record_bt_microphone(hci_con_handle_t acl_handle)
 {
     set_bt_mode(RECORDING);
@@ -39,15 +43,81 @@ static uint8_t record_bt_microphone(hci_con_handle_t acl_handle)
 
 }
 
-static uint8_t playback_bt_speaker(hci_con_handle_t acl_handle) 
-{
+static uint8_t playback_bt_speaker(hci_con_handle_t acl_handle) {
     if(cycle_number == 0) {
         printf("Nothing recorded yet. Press 4 to record voice audio. \n");
-        return; }
+        return NULL; }
     set_bt_mode(LISTENING);
      uint8_t stat = hfp_ag_establish_audio_connection(acl_handle);
     return stat;
 }
+
+static void set_codec2_state(bool on_off)
+{
+    connection_mode = on_off;
+}
+
+static bool codec2_enabled()
+{
+    return is_codec2_on;
+}
+
+void toggle_codec2() { // вкл-выкл обработки буффера с кодек2
+    if(codec2_enabled()) {
+        set_codec2_state(OFF); // выключает кодек2 если прежде был включен
+        printf("Codec2 processing has been disabled \n ");
+        return;
+    }
+    else {
+        set_codec2_state(ON); // включает кодек2 если прежде был выключен
+        printf("Codec2 processing has been enabled \n ");
+        return; }
+}
+void abort_audio(hci_con_handle_t acl_handle) {
+    hfp_ag_release_audio_connection(acl_handle);
+}
+
+bool current_bt_mode()
+{
+    return connection_mode;
+}
+
+// void report_audio_status() {
+//     if(audio_handle == NULL) {
+//         printf("Error: unknown handle. Provide audio handle to proceed."); return; }
+//     if(audio_handle->mic_buff != NULL &&
+//        audio_handle->spkr_buff != NULL ) {
+//         printf("\n\n Audio buffers initialized. \n\n");
+//         printf("Buffer size: %d bytes\n\n", audio_handle->buf_size); 
+//         printf("Buffer length: %d elements\n\n",audio_handle->buf_length);
+//         printf("Time equivalent: %f ms\n\n",(float)(audio_handle->buf_time)/1000.0);
+//        }
+//     else {
+//         printf("Error: Mic or speaker audio buffer NOT initialiazed. \n\n"); 
+//         return; }
+//     printf("Total record time: %d seconds \n\n", audio_handle->rb_time);
+//     printf("Total byte size: %d bytes\n\n", audio_handle->rb_size);
+//     printf("Total elements in array: %d\n\n", audio_handle->rb_length);
+//     printf("ringbuffer increase coefficient: %f", audio_handle->rb_coef);
+//     if(audio_handle->sco_conn_state == NULL)
+//         printf("\n\n\n Mode: Sending audio to speaker.\n\n");
+
+//     if(audio_handle->sco_conn_state == NULL)
+//         printf("\n\n\n Mode: recording microphone.\n\n");
+
+//     if(codec2_enabled())
+//         printf("Codec2 processing ENABLED. \n\n");
+//     else
+//         printf("Codec2 processing DISABLED. \n\n");
+//     if(audio_handle->record_cycle_num != 0) {
+//         printf("Recorded audio: %d times \n\n", audio_handle->record_cycle_num);
+//         if(audio_handle->playback_cycle_num == 0)
+//             printf("Did not play recorded data yet. Press 5 to listen to recorded audio. \n\n");
+//         else
+//             printf("Listened to audio: %d times \n\n", audio_handle->playback_cycle_num); }
+//     else
+//         printf("othing recorded yet. Press 4 to record voice audio. \n\n");
+// }
 
 void stdin_process(char cmd) {
     uint8_t status = ERROR_CODE_SUCCESS;
@@ -96,9 +166,9 @@ void stdin_process(char cmd) {
             abort_audio(acl_handle);
             printf("Stopped audio. Cleared buffers. \n Press 6 to record again. \n");
             break;
-        case '8':
-            log_info("USER:\'%c\'", cmd);
-            report_audio_status();
+        // case '8':
+        //     log_info("USER:\'%c\'", cmd);
+        //     report_audio_status();
         case 'a':
             log_info("USER:\'%c\'", cmd);
             printf("Report AG failure\n");
@@ -194,9 +264,9 @@ static void report_status(uint8_t status, const char * message){
 void sco_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * event, uint16_t event_size)
 {
     UNUSED(channel);
-    switch (packet_type)
+    switch(packet_type)
     {
-        if(connection_mode == LISTENING)
+        // if(connection_mode == LISTENING)
         case HCI_EVENT_PACKET:
             switch(hci_event_packet_get_type(event))
             {
@@ -207,7 +277,7 @@ void sco_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * event, 
                     break;
             }
         
-        if(connection_mode == RECORDING) 
+        // if(connection_mode == RECORDING) 
         case HCI_SCO_DATA_PACKET:
             if (READ_SCO_CONNECTION_HANDLE(event) != sco_handle) break;
             sco_receive(event, event_size);
@@ -463,9 +533,5 @@ int btstack_main(int argc, const char * argv[])
 #endif  
     // turn on!
     hci_power_control(HCI_POWER_ON);
-    
-    printf("\n\nFirst time init. Allocating buffers for %d second sound. \n\n", SECONDS_TO_BYTES);
-    report_audio_status();   
-
     return 0;
 }

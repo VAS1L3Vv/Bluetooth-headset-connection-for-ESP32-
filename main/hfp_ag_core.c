@@ -69,6 +69,9 @@ static void show_usage(void){
 
 static bool connection_mode = LISTENING;
 static int cycle_number = 0;
+static int bytes_recieved;
+static int bytes_sent = 0;
+static bool audio_streaming = 0;
 
 static void set_bt_mode(bool mode) {
     connection_mode = mode;
@@ -76,6 +79,13 @@ static void set_bt_mode(bool mode) {
 
 static uint8_t record_bt_microphone(hci_con_handle_t acl_handle)
 {
+    if(audio_streaming){
+        printf("Loopbakc already started. \nWait for the end to record again.\n ");
+        return (uint8_t)0x00;
+    }
+
+    audio_streaming = 1;
+    bytes_recieved = 0;
     set_bt_mode(RECORDING);
     uint8_t stat = hfp_ag_establish_audio_connection(acl_handle);
     return stat;
@@ -84,11 +94,12 @@ static uint8_t record_bt_microphone(hci_con_handle_t acl_handle)
 }
 
 static uint8_t playback_bt_speaker(hci_con_handle_t acl_handle) {
+    bytes_sent = 0;
     if(cycle_number == 0) {
         printf("Nothing recorded yet. Press 4 to record voice audio. \n");
         return NULL; }
     set_bt_mode(LISTENING);
-     uint8_t stat = hfp_ag_establish_audio_connection(acl_handle);
+    uint8_t stat = hfp_ag_establish_audio_connection(acl_handle);
     return stat;
 }
 
@@ -104,6 +115,8 @@ void toggle_codec2() { // вкл-выкл обработки буффера с �
         return; }
 }
 void abort_audio(hci_con_handle_t acl_handle) {
+    bytes_recieved = 0;
+    bytes_sent = 0;
     hfp_ag_release_audio_connection(acl_handle);
 }
 
@@ -264,7 +277,7 @@ void sco_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * event, 
             switch(hci_event_packet_get_type(event))
             {
                 case HCI_EVENT_SCO_CAN_SEND_NOW:
-                    sco_send(sco_handle); 
+                    sco_send(sco_handle);
                     break; 
                 default:
                     break;
@@ -275,6 +288,11 @@ void sco_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * event, 
             if (READ_SCO_CONNECTION_HANDLE(event) != sco_handle) break;
             // printf("recieved sco packet size: %d bytes \n\n", (event_size-3));
             sco_receive(event, event_size);
+            bytes_recieved += SCO_PACKET_SIZE;
+                    if(bytes_recieved >= SECONDS_TO_BYTES) {
+                        abort_audio(acl_handle);
+                        printf("\n\n microphone playback completed.  \n Press 4 to listen to mic again.");
+                    } 
             break;
         default:
             break;

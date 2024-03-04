@@ -10,7 +10,7 @@
 #include "bt_audio_handler.h"
 
 // number of sco packets until 'report' on console
-#define SCO_REPORT_PERIOD           100
+#define SCO_REPORT_PERIOD           130
 // constants
 #define REFILL_SAMPLES          16 // проверка и запись в буффер передачи по 16 элементов
 // audio pre-buffer - also defines latency
@@ -197,6 +197,8 @@ void sco_receive(uint8_t * packet, uint16_t size){
     codec_current->receive(packet, size);
 }
 
+static uint8_t sec = 0;
+
 void sco_send(hci_con_handle_t sco_handle){
 
     if (sco_handle == HCI_CON_HANDLE_INVALID) return;
@@ -229,14 +231,19 @@ void sco_send(hci_con_handle_t sco_handle){
     // request another send event
     hci_request_sco_can_send_now_event();
 
-    count_sent++;
     
+    count_sent++;
     if ((count_sent % SCO_REPORT_PERIOD) == 0) {
-        printf("SCO: sent %u, received %u\n", count_sent, count_received);
+        // printf("SCO: sent %u, received %u\n", count_sent, count_received);
+        printf("\n%d\n",sec);
+    sec++;
     }
+    if(sec == 10)
+    sec = 0;
 }
 
 void sco_close(void){
+    sec = 0;
     printf("SCO demo close\n");
     printf("SCO demo statistics: ");
     codec_current->close();

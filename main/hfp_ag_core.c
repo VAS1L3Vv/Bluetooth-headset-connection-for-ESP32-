@@ -1,87 +1,6 @@
 #define BTSTACK_FILE__ "hfp_ag.c"
 #include "hfp_ag_core.h"
 
-// Testig User Interface 
-static void show_usage(void){
-    bd_addr_t iut_address;
-    gap_local_bd_addr(iut_address);
-    printf("\n--- Bluetooth HFP Audiogateway (AG) unit Test Console %s ---\n", bd_addr_to_str(iut_address));
-    printf("\n");
-    printf("1 - scan nearby HF units\n");
-    // соъздадим базу даннных макс. из 10 устройств для подключения 
-    printf("2 - establish HFP connection %s\n", bd_addr_to_str(device_addr));
-    printf("3 - release HFP connection\n");
-    // printf("4 - establish audio connection\n");
-    // printf("5 - release audio connection\n");
-    printf("4 - record headset microphone for 10 seconds\n");
-    printf("5 - playback recorded audio\n");
-    printf("6 - toggle proccessing with codec2\n");
-    printf("7 - abort voice and clear buffer\n");
-    printf("8 - report status \n\n\n");
-    printf("a - report AG failure\n");
-    printf("b - delete all link keys\n");
-    printf("c - Set signal strength to 0            | C - Set signal strength to 5\n");
-    printf("d - Set battery level to 3              | D - Set battery level to 5\n");
-    printf("e - Set speaker volume to 0  (minimum)  | E - Set speaker volume to 9  (default)\n");
-    printf("f - Set speaker volume to 12 (higher)   | F - Set speaker volume to 15 (maximum)\n");
-    printf("g - Set microphone gain to 0  (minimum) | G - Set microphone gain to 9  (default)\n");
-    printf("h - Set microphone gain to 12 (higher)  | H - Set microphone gain to 15 (maximum)\n");
-    printf("T - terminate connection\n");
-    printf("---\n");
-}
-
-static void set_bt_mode(bool mode) {
-    connection_mode = mode;
-}
-
-static uint8_t record_bt_microphone(hci_con_handle_t acl_handle)
-{
-    set_bt_mode(RECORDING);
-    uint8_t stat = hfp_ag_establish_audio_connection(acl_handle);
-    return stat;
-    // audio_handle->record_cycle_num++; // AT THE VERY END
-
-}
-
-static uint8_t playback_bt_speaker(hci_con_handle_t acl_handle) {
-    if(cycle_number == 0) {
-        printf("Nothing recorded yet. Press 4 to record voice audio. \n");
-        return NULL; }
-    set_bt_mode(LISTENING);
-     uint8_t stat = hfp_ag_establish_audio_connection(acl_handle);
-    return stat;
-}
-
-static void set_codec2_state(bool on_off)
-{
-    connection_mode = on_off;
-}
-
-static bool codec2_enabled()
-{
-    return is_codec2_on;
-}
-
-void toggle_codec2() { // вкл-выкл обработки буффера с кодек2
-    if(codec2_enabled()) {
-        set_codec2_state(OFF); // выключает кодек2 если прежде был включен
-        printf("Codec2 processing has been disabled \n ");
-        return;
-    }
-    else {
-        set_codec2_state(ON); // включает кодек2 если прежде был выключен
-        printf("Codec2 processing has been enabled \n ");
-        return; }
-}
-void abort_audio(hci_con_handle_t acl_handle) {
-    hfp_ag_release_audio_connection(acl_handle);
-}
-
-bool current_bt_mode()
-{
-    return connection_mode;
-}
-
 // void report_audio_status() {
 //     if(audio_handle == NULL) {
 //         printf("Error: unknown handle. Provide audio handle to proceed."); return; }
@@ -118,6 +37,80 @@ bool current_bt_mode()
 //     else
 //         printf("othing recorded yet. Press 4 to record voice audio. \n\n");
 // }
+
+// Testig User Interface
+static void show_usage(void){
+    bd_addr_t iut_address;
+    gap_local_bd_addr(iut_address);
+    printf("\n--- Bluetooth HFP Audiogateway (AG) unit Test Console %s ---\n", bd_addr_to_str(iut_address));
+    printf("\n");
+    printf("1 - scan nearby HF units\n");
+    // соъздадим базу даннных макс. из 10 устройств для подключения 
+    printf("2 - establish HFP connection %s\n", bd_addr_to_str(device_addr));
+    printf("3 - release HFP connection\n");
+    // printf("4 - establish audio connection\n");
+    // printf("5 - release audio connection\n");
+    printf("4 - record headset microphone for 10 seconds\n");
+    printf("5 - playback recorded audio\n");
+    printf("6 - toggle proccessing with codec2\n");
+    printf("7 - abort voice and clear buffer\n");
+    printf("8 - report status \n\n\n");
+    printf("a - report AG failure\n");
+    printf("b - delete all link keys\n");
+    printf("c - Set signal strength to 0            | C - Set signal strength to 5\n");
+    printf("d - Set battery level to 3              | D - Set battery level to 5\n");
+    printf("e - Set speaker volume to 0  (minimum)  | E - Set speaker volume to 9  (default)\n");
+    printf("f - Set speaker volume to 12 (higher)   | F - Set speaker volume to 15 (maximum)\n");
+    printf("g - Set microphone gain to 0  (minimum) | G - Set microphone gain to 9  (default)\n");
+    printf("h - Set microphone gain to 12 (higher)  | H - Set microphone gain to 15 (maximum)\n");
+    printf("T - terminate connection\n");
+    printf("---\n");
+}
+
+static bool connection_mode = LISTENING;
+static int cycle_number = 0;
+
+static void set_bt_mode(bool mode) {
+    connection_mode = mode;
+}
+
+static uint8_t record_bt_microphone(hci_con_handle_t acl_handle)
+{
+    set_bt_mode(RECORDING);
+    uint8_t stat = hfp_ag_establish_audio_connection(acl_handle);
+    return stat;
+    // audio_handle->record_cycle_num++; // AT THE VERY END
+
+}
+
+static uint8_t playback_bt_speaker(hci_con_handle_t acl_handle) {
+    if(cycle_number == 0) {
+        printf("Nothing recorded yet. Press 4 to record voice audio. \n");
+        return NULL; }
+    set_bt_mode(LISTENING);
+     uint8_t stat = hfp_ag_establish_audio_connection(acl_handle);
+    return stat;
+}
+
+void toggle_codec2() { // вкл-выкл обработки буффера с кодек2
+    if(codec2_enabled()) {
+        set_codec2_state(OFF); // выключает кодек2 если прежде был включен
+        printf("Codec2 processing has been disabled \n ");
+        return;
+    }
+    else {
+        set_codec2_state(ON); // включает кодек2 если прежде был выключен
+        printf("Codec2 processing has been enabled \n ");
+        return; }
+}
+void abort_audio(hci_con_handle_t acl_handle) {
+    hfp_ag_release_audio_connection(acl_handle);
+}
+
+bool current_bt_mode()
+{
+    return connection_mode;
+}
 
 void stdin_process(char cmd) {
     uint8_t status = ERROR_CODE_SUCCESS;
@@ -276,10 +269,11 @@ void sco_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * event, 
                 default:
                     break;
             }
-        
+
         // if(connection_mode == RECORDING) 
         case HCI_SCO_DATA_PACKET:
             if (READ_SCO_CONNECTION_HANDLE(event) != sco_handle) break;
+            // printf("recieved sco packet size: %d bytes \n\n", (event_size-3));
             sco_receive(event, event_size);
             break;
         default:
@@ -367,7 +361,7 @@ void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * event, uint
                         hci_request_sco_can_send_now_event();
                     }
                     break;
-          
+
                 case HFP_SUBEVENT_AUDIO_CONNECTION_RELEASED:
                     printf("Audio connection released\n");
                     sco_handle = HCI_CON_HANDLE_INVALID;

@@ -25,7 +25,6 @@ static int                   audio_output_paused  = 0;
 static int                   audio_input_paused   = 0;
 static uint8_t               audio_ring_buffer_storage[MAX_BUFFER_SIZE_BYTES]; // указатель памяти кольцевого буффера
 static btstack_ring_buffer_t audio_ring_buffer;
- 
 // input
 #define USE_AUDIO_INPUT
 static int count_sent = 0;
@@ -63,6 +62,18 @@ static audio_struct_t audio_data = {
 // current configuration
 static const codec_support_t * codec_current = NULL;
 // static const audio_struct_t * audio_handle = get_audio_handle();
+
+static bool is_codec2_on = OFF;
+
+bool codec2_enabled()
+{
+    return is_codec2_on;
+}
+
+void set_codec2_state(bool on_off)
+{
+    is_codec2_on = on_off;
+}
 
 // return 1 if ok
 static int audio_initialize(int sample_rate) {
@@ -192,10 +203,11 @@ void sco_send(hci_con_handle_t sco_handle){
 
     int sco_packet_length = hci_get_sco_packet_length();
     int sco_payload_length = sco_packet_length - 3;
-    printf("sco payload length: %d", sco_payload_length);
+    // printf("sco payload length: %d \n\n", sco_payload_length);
     hci_reserve_packet_buffer(); // подготовка к отправке пакета
     uint8_t * sco_packet = hci_get_outgoing_packet_buffer(); // получаем указатель на передаваемый sco пакет
 
+    // printf("sco payload size: %d", );
     // resume if pre-buffer is filled
     if (audio_input_paused){
         if (btstack_ring_buffer_bytes_available(&audio_ring_buffer) >= audio_prebuffer_bytes){
@@ -218,6 +230,7 @@ void sco_send(hci_con_handle_t sco_handle){
     hci_request_sco_can_send_now_event();
 
     count_sent++;
+    
     if ((count_sent % SCO_REPORT_PERIOD) == 0) {
         printf("SCO: sent %u, received %u\n", count_sent, count_received);
     }

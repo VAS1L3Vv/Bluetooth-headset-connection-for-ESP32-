@@ -1,55 +1,14 @@
 #define BTSTACK_FILE__ "hfp_ag.c"
 #include "hfp_ag_core.h"
 
-// void report_audio_status() {
-//     if(audio_handle == NULL) {
-//         printf("Error: unknown handle. Provide audio handle to proceed."); return; }
-//     if(audio_handle->mic_buff != NULL &&
-//        audio_handle->spkr_buff != NULL ) {
-//         printf("\n\n Audio buffers initialized. \n\n");
-//         printf("Buffer size: %d bytes\n\n", audio_handle->buf_size); 
-//         printf("Buffer length: %d elements\n\n",audio_handle->buf_length);
-//         printf("Time equivalent: %f ms\n\n",(float)(audio_handle->buf_time)/1000.0);
-//        }
-//     else {
-//         printf("Error: Mic or speaker audio buffer NOT initialiazed. \n\n"); 
-//         return; }
-//     printf("Total record time: %d seconds \n\n", audio_handle->rb_time);
-//     printf("Total byte size: %d bytes\n\n", audio_handle->rb_size);
-//     printf("Total elements in array: %d\n\n", audio_handle->rb_length);
-//     printf("ringbuffer increase coefficient: %f", audio_handle->rb_coef);
-//     if(audio_handle->sco_conn_state == NULL)
-//         printf("\n\n\n Mode: Sending audio to speaker.\n\n");
-
-//     if(audio_handle->sco_conn_state == NULL)
-//         printf("\n\n\n Mode: recording microphone.\n\n");
-
-//     if(codec2_enabled())
-//         printf("Codec2 processing ENABLED. \n\n");
-//     else
-//         printf("Codec2 processing DISABLED. \n\n");
-//     if(audio_handle->record_cycle_num != 0) {
-//         printf("Recorded audio: %d times \n\n", audio_handle->record_cycle_num);
-//         if(audio_handle->playback_cycle_num == 0)
-//             printf("Did not play recorded data yet. Press 5 to listen to recorded audio. \n\n");
-//         else
-//             printf("Listened to audio: %d times \n\n", audio_handle->playback_cycle_num); }
-//     else
-//         printf("othing recorded yet. Press 4 to record voice audio. \n\n");
-// }
-
-// Testig User Interface
 static void show_usage(void){
     bd_addr_t iut_address;
     gap_local_bd_addr(iut_address);
     printf("\n--- Bluetooth HFP Audiogateway (AG) unit Test Console %s ---\n", bd_addr_to_str(iut_address));
     printf("\n");
     printf("1 - scan nearby HF units\n");
-    // соъздадим базу даннных макс. из 10 устройств для подключения 
     printf("2 - establish HFP connection %s\n", bd_addr_to_str(device_addr));
     printf("3 - release HFP connection\n");
-    // printf("4 - establish audio connection\n");
-    // printf("5 - release audio connection\n");
     printf("4 - record headset microphone for 10 seconds\n");
     printf("5 - playback recorded audio\n");
     printf("6 - toggle proccessing with codec2\n");
@@ -125,6 +84,11 @@ bool current_bt_mode()
     return connection_mode;
 }
 
+static void report_audio_status()
+{
+    return;
+}
+
 void stdin_process(char cmd) {
     uint8_t status = ERROR_CODE_SUCCESS;
 
@@ -156,12 +120,12 @@ void stdin_process(char cmd) {
         case '4':
             log_info("USER:\'%c\'", cmd);
             status = record_bt_microphone(acl_handle);
-            // report_audio_status();
+            report_audio_status();
             break;
         case '5':
             log_info("USER:\'%c\'", cmd);
             status = playback_bt_speaker(acl_handle);
-            // report_audio_status();
+            report_audio_status();
             break;
         case '6':
             log_info("USER:\'%c\'", cmd);
@@ -172,9 +136,9 @@ void stdin_process(char cmd) {
             abort_audio(acl_handle);
             printf("Stopped audio. Cleared buffers. \n Press 6 to record again. \n");
             break;
-        // case '8':
-        //     log_info("USER:\'%c\'", cmd);
-        //     report_audio_status();
+        case '8':
+            log_info("USER:\'%c\'", cmd);
+            report_audio_status();
         case 'a':
             log_info("USER:\'%c\'", cmd);
             printf("Report AG failure\n");
@@ -272,18 +236,19 @@ void sco_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * event, 
     UNUSED(channel);
     switch(packet_type)
     {
-        // if(connection_mode == LISTENING)
+        if(connection_mode == LISTENING)
         case HCI_EVENT_PACKET:
             switch(hci_event_packet_get_type(event))
             {
                 case HCI_EVENT_SCO_CAN_SEND_NOW:
                     sco_send(sco_handle);
+                    bytes_sent += SCO_PACKET_SIZE;
                     break; 
                 default:
                     break;
             }
 
-        // if(connection_mode == RECORDING) 
+        if(connection_mode == RECORDING) 
         case HCI_SCO_DATA_PACKET:
             if (READ_SCO_CONNECTION_HANDLE(event) != sco_handle) break;
             // printf("recieved sco packet size: %d bytes \n\n", (event_size-3));

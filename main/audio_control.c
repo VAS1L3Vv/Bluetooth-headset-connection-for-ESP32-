@@ -7,7 +7,6 @@
 #include "classic/btstack_cvsd_plc.h"
 #include "classic/btstack_sbc.h"
 #include "classic/hfp.h"
-#include "bt_audio_handler.h"
 
 // number of sco packets until 'report' on console
 #define SCO_REPORT_PERIOD           130
@@ -25,11 +24,12 @@ static int                   audio_output_paused  = 0;
 static int                   audio_input_paused   = 0;
 static uint8_t               audio_ring_buffer_storage[MAX_BUFFER_SIZE_BYTES]; // указатель памяти кольцевого буффера
 static btstack_ring_buffer_t audio_ring_buffer;
+
 // input
-#define USE_AUDIO_INPUT
 static int count_sent = 0;
 static int count_received = 0;
 static btstack_cvsd_plc_state_t cvsd_plc_state;
+static uint8_t sec = 0;
 
 int num_samples_to_write;
 int num_audio_frames;
@@ -43,25 +43,7 @@ typedef struct {
     uint16_t sample_rate;
 } codec_support_t;
 
-static audio_struct_t audio_data = {
-        .mic_buff = NULL,
-        .spkr_buff = NULL,
-        .buf_size = 0,
-        .buf_length = 0,
-        .buf_time = 0,
-        .rb_size = 0,
-        .rb_length = 0,
-        .rb_time = 0,
-        .rb_coef = 1.5,
-        .codec2_enabled = OFF,
-        .record_cycle_num = 0,
-        .playback_cycle_num = 0,
-        .sco_conn_state = LISTENING, // при инициализации стоит в режиме "прослушивания" пакетов
-    }; // изначальные данные
-
-// current configuration
 static const codec_support_t * codec_current = NULL;
-// static const audio_struct_t * audio_handle = get_audio_handle();
 
 static bool is_codec2_on = OFF;
 
@@ -112,6 +94,8 @@ static void cvsd_receive(const uint8_t * packet, uint16_t size) {
     btstack_ring_buffer_write(&audio_ring_buffer, (uint8_t *)audio_frame_out, audio_bytes_read);
 }
 
+static void cvsd_receive_null(const uint8_t * packet, uint16_t size){}
+
 static void cvsd_fill_payload(uint8_t * payload_buffer, uint16_t sco_payload_length) {
     uint16_t bytes_to_copy = sco_payload_length;
     // get data from ringbuffer
@@ -138,13 +122,23 @@ static void cvsd_fill_payload(uint8_t * payload_buffer, uint16_t sco_payload_len
     }
 }
 
+static void cvsd_fill_null(uint8_t * payload_buffer, uint16_t sco_payload_length){}
+
 static void cvsd_close(void) { 
     printf("Used CVSD with PLC, number of proccesed frames: \n - %d good frames, \n - %d bad frames.\n", cvsd_plc_state.good_frames_nr, cvsd_plc_state.bad_frames_nr);
 }
 
-static const codec_support_t codec_cvsd = {
+static const codec_support_t recieve_cvsd = {
         .init         = &cvsd_init,
         .receive      = &cvsd_receive,
+        .fill_payload = &cvsd_fill_payload,
+        .close        = &cvsd_close,
+        .sample_rate = SAMPLE_RATE_8KHZ
+};
+
+static const codec_support_t playback_cvsd = {
+        .init         = &cvsd_init,
+        .receive      = &cvsd_receive_null,
         .fill_payload = &cvsd_fill_payload,
         .close        = &cvsd_close,
         .sample_rate = SAMPLE_RATE_8KHZ
@@ -156,23 +150,25 @@ void sco_init(void)
     printf("Disable BR/EDR Secure Connections due to incompatibilities with SCO connections\n");
     gap_secure_connections_enable(false);
 #endif
-    // Set SCO for CVSD (mSBC or other codecs automatically use 8-bit transparent mode)
-    hci_set_sco_voice_setting(0x60);    // linear, unsigned, 16-bit, CVSD
+    hci_set_sco_voice_setting(0x60);
 }
 
-void sco_set_codec(uint8_t negotiated_codec)
+void sco_set_codec(uint8_t negotiated_codec, bool con_mode)
 {
-    switch (negotiated_codec){
-        case HFP_CODEC_CVSD:
-            codec_current = &codec_cvsd;
-            break;
-        default:
-            printf("SCO_UTIL ERROR: CSVD CODEC NOT SET.");
-            btstack_assert(false);
-            break;
+    switch (con_mode)
+    {
+    case PLAYBACK:
+        codec_current = &playback_cvsd;
+        break;
+    case RECORDING:
+        codec_current = &recieve_cvsd;
+        audio_initialize(codec_current->sample_rate);
+    default:
+        break;
     }
     codec_current->init();
-    audio_initialize(codec_current->sample_rate);
+
+    // Will probably change this
     audio_prebuffer_bytes = SCO_PREBUFFER_MS * (codec_current->sample_rate/1000) * BYTES_PER_FRAME;
 }
 
@@ -187,17 +183,22 @@ void sco_receive(uint8_t * packet, uint16_t size){
     data_received += size - 3;
     packets++;
     if (data_received > 100000){
-        printf("Summary: data %07u, packets %04u, packet with crc errors %0u, byte errors %04u\n",  (unsigned int) data_received,  (unsigned int) packets, (unsigned int) crc_errors, (unsigned int) byte_errors);
+        // printf("Summary: data %07u, packets %04u, packet with crc errors %0u, byte errors %04u\n",  (unsigned int) data_received,  (unsigned int) packets, (unsigned int) crc_errors, (unsigned int) byte_errors);
         crc_errors = 0;
         byte_errors = 0;
         data_received = 0;
         packets = 0;
     }
-
     codec_current->receive(packet, size);
+    count_sent++;
+    if ((count_sent % SCO_REPORT_PERIOD) == 0) {
+        // printf("SCO: sent %u, received %u\n", count_sent, count_received);
+        printf("\n%d\n",sec);
+    sec++;
+    }
+    if(sec == 10)
+    sec = 0;
 }
-
-static uint8_t sec = 0;
 
 void sco_send(hci_con_handle_t sco_handle){
 
@@ -205,12 +206,10 @@ void sco_send(hci_con_handle_t sco_handle){
 
     int sco_packet_length = hci_get_sco_packet_length();
     int sco_payload_length = sco_packet_length - 3;
-    // printf("sco payload length: %d \n\n", sco_payload_length);
+
     hci_reserve_packet_buffer(); // подготовка к отправке пакета
     uint8_t * sco_packet = hci_get_outgoing_packet_buffer(); // получаем указатель на передаваемый sco пакет
 
-    // printf("sco payload size: %d", );
-    // resume if pre-buffer is filled
     if (audio_input_paused){
         if (btstack_ring_buffer_bytes_available(&audio_ring_buffer) >= audio_prebuffer_bytes){
             // resume sending
@@ -231,15 +230,6 @@ void sco_send(hci_con_handle_t sco_handle){
     // request another send event
     hci_request_sco_can_send_now_event();
 
-    
-    count_sent++;
-    if ((count_sent % SCO_REPORT_PERIOD) == 0) {
-        // printf("SCO: sent %u, received %u\n", count_sent, count_received);
-        printf("\n%d\n",sec);
-    sec++;
-    }
-    if(sec == 10)
-    sec = 0;
 }
 
 void sco_close(void){

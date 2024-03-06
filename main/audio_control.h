@@ -20,8 +20,8 @@ extern "C" {
 #define FRAME_SIZE CODEC2_FRAME_SIZE
 #define FRAME_LENGTH FRAME_SIZE/BYTES_PER_SAMPLE
 #define NUMBER_OF_FRAMES        10
-#define MAX_BUFFER_SIZE_BYTES FRAME_SIZE*NUMBER_OF_FRAMES
-#define LISTENING               0 
+#define MAX_BUFFER_SIZE_BYTES   65000
+#define PLAYBACK                0 
 #define RECORDING               1
 
 bool codec2_enabled();
@@ -32,11 +32,12 @@ void set_codec2_state(bool on_off);
  */
 void sco_init(void);
 
+
 /**
  * @brief Set codec (cvsd:0x01, msbc:0x02) and initalize wav writter and portaudio .
  * @param codec
  */
- void sco_set_codec(uint8_t codec);
+void sco_set_codec(uint8_t negotiated_codec, bool con_mode);
 
 /**
  * @brief Send next data on con_handle

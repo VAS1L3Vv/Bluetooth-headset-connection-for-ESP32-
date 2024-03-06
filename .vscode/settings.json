@@ -16,6 +16,11 @@
         "hfp_ag_core.h": "c",
         "bt_audio_handler.h": "c",
         "btstack.h": "c",
-        "hci.h": "c"
+        "hci.h": "c",
+        "*.ipp": "c",
+        "*.inc": "c",
+        "*.tcc": "c",
+        "complex": "c",
+        "fstream": "c"
     }
 }

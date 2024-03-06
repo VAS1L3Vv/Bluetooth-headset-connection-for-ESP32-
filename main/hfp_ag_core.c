@@ -1,7 +1,57 @@
 #define BTSTACK_FILE__ "hfp_ag.c"
 #include "hfp_ag_core.h"
 
-static void show_usage(void){
+static bool connection_mode;
+static int cycle_number = 0;
+static int data_bytes = 0;
+static bool audio_streaming = 0;
+
+static void set_bt_mode(bool mode) {
+    connection_mode = mode;
+}
+
+static uint8_t record_bt_microphone(hci_con_handle_t acl_handle)
+{
+    if(audio_streaming){
+        printf("Audio stream already in progress. \nWait for it to end.\n ");
+        return (uint8_t)0x00;}
+    data_bytes = 0;
+    set_bt_mode(RECORDING);
+    uint8_t stat = hfp_ag_establish_audio_connection(acl_handle);
+    return stat;
+}
+
+static uint8_t playback_bt_speaker(hci_con_handle_t acl_handle)
+{
+    if(audio_streaming){
+        printf("Audio stream already in progress. \nWait for it to end.\n ");
+        return (uint8_t)0x00;}
+    if(cycle_number == 0) {
+        printf("Nothing recorded yet. Press 4 to record voice audio. \n");
+        return NULL; }
+    data_bytes = 0;
+    set_bt_mode(PLAYBACK);
+    uint8_t stat = hfp_ag_establish_audio_connection(acl_handle);
+    return stat;
+}
+
+static void toggle_codec2() { // вкл-выкл обработки буффера с кодек2
+    if(codec2_enabled()) {
+        set_codec2_state(OFF); // выключает кодек2 если прежде был включен
+        printf("Codec2 processing has been disabled \n ");
+        return;
+    }
+    else {
+        set_codec2_state(ON); // включает кодек2 если прежде был выключен
+        printf("Codec2 processing has been enabled \n ");
+        return; }
+}
+
+static bool current_bt_mode(){
+    return connection_mode;
+}
+
+static void show_usage(void){ 
     bd_addr_t iut_address;
     gap_local_bd_addr(iut_address);
     printf("\n--- Bluetooth HFP Audiogateway (AG) unit Test Console %s ---\n", bd_addr_to_str(iut_address));
@@ -11,9 +61,8 @@ static void show_usage(void){
     printf("3 - release HFP connection\n");
     printf("4 - record headset microphone for 10 seconds\n");
     printf("5 - playback recorded audio\n");
-    printf("6 - toggle proccessing with codec2\n");
-    printf("7 - abort voice and clear buffer\n");
-    printf("8 - report status \n\n\n");
+    printf("6 - toggle codec2 processing\n");
+    printf("7 - abort audio.\n");
     printf("a - report AG failure\n");
     printf("b - delete all link keys\n");
     printf("c - Set signal strength to 0            | C - Set signal strength to 5\n");
@@ -26,72 +75,8 @@ static void show_usage(void){
     printf("---\n");
 }
 
-static bool connection_mode = LISTENING;
-static int cycle_number = 0;
-static int bytes_recieved;
-static int bytes_sent = 0;
-static bool audio_streaming = 0;
-
-static void set_bt_mode(bool mode) {
-    connection_mode = mode;
-}
-
-static uint8_t record_bt_microphone(hci_con_handle_t acl_handle)
-{
-    if(audio_streaming){
-        printf("Loopbakc already started. \nWait for the end to record again.\n ");
-        return (uint8_t)0x00;
-    }
-
-    audio_streaming = 1;
-    bytes_recieved = 0;
-    set_bt_mode(RECORDING);
-    uint8_t stat = hfp_ag_establish_audio_connection(acl_handle);
-    return stat;
-    // audio_handle->record_cycle_num++; // AT THE VERY END
-
-}
-
-static uint8_t playback_bt_speaker(hci_con_handle_t acl_handle) {
-    bytes_sent = 0;
-    if(cycle_number == 0) {
-        printf("Nothing recorded yet. Press 4 to record voice audio. \n");
-        return NULL; }
-    set_bt_mode(LISTENING);
-    uint8_t stat = hfp_ag_establish_audio_connection(acl_handle);
-    return stat;
-}
-
-void toggle_codec2() { // вкл-выкл обработки буффера с кодек2
-    if(codec2_enabled()) {
-        set_codec2_state(OFF); // выключает кодек2 если прежде был включен
-        printf("Codec2 processing has been disabled \n ");
-        return;
-    }
-    else {
-        set_codec2_state(ON); // включает кодек2 если прежде был выключен
-        printf("Codec2 processing has been enabled \n ");
-        return; }
-}
-void abort_audio(hci_con_handle_t acl_handle) {
-    bytes_recieved = 0;
-    bytes_sent = 0;
-    hfp_ag_release_audio_connection(acl_handle);
-}
-
-bool current_bt_mode()
-{
-    return connection_mode;
-}
-
-static void report_audio_status()
-{
-    return;
-}
-
-void stdin_process(char cmd) {
+void stdin_process(char cmd){
     uint8_t status = ERROR_CODE_SUCCESS;
-
     switch (cmd){
         case '1':
             printf("Start scanning...\n");
@@ -112,20 +97,13 @@ void stdin_process(char cmd) {
             printf("Establish Audio connection %s...\n", bd_addr_to_str(device_addr));
             status = hfp_ag_establish_audio_connection(acl_handle);
             break;
-        case '0':
-            log_info("USER:\'%c\'", cmd);
-            printf("Release Audio connection.\n");
-            status = hfp_ag_release_audio_connection(acl_handle);
-            break;
         case '4':
             log_info("USER:\'%c\'", cmd);
             status = record_bt_microphone(acl_handle);
-            report_audio_status();
             break;
         case '5':
             log_info("USER:\'%c\'", cmd);
             status = playback_bt_speaker(acl_handle);
-            report_audio_status();
             break;
         case '6':
             log_info("USER:\'%c\'", cmd);
@@ -133,12 +111,9 @@ void stdin_process(char cmd) {
             break;
         case '7':
             log_info("USER:\'%c\'", cmd);
-            abort_audio(acl_handle);
-            printf("Stopped audio. Cleared buffers. \n Press 6 to record again. \n");
+            printf("Abort Audio.\n");
+            status = hfp_ag_release_audio_connection(acl_handle);
             break;
-        case '8':
-            log_info("USER:\'%c\'", cmd);
-            report_audio_status();
         case 'a':
             log_info("USER:\'%c\'", cmd);
             printf("Report AG failure\n");
@@ -233,34 +208,36 @@ static void report_status(uint8_t status, const char * message){
 
 void sco_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * event, uint16_t event_size)
 {
+        if(data_bytes >= SECONDS_TO_BYTES) {
+        hfp_ag_release_audio_connection(acl_handle);
+        printf("\n\n microphone playback completed.  \n Press 4 to listen to mic again.");
+    }
     UNUSED(channel);
     switch(packet_type)
     {
-        if(connection_mode == LISTENING)
         case HCI_EVENT_PACKET:
+            if(connection_mode == PLAYBACK) {
             switch(hci_event_packet_get_type(event))
             {
                 case HCI_EVENT_SCO_CAN_SEND_NOW:
                     sco_send(sco_handle);
-                    bytes_sent += SCO_PACKET_SIZE;
-                    break; 
+                    data_bytes += SCO_PACKET_SIZE;
+                    break;
                 default:
                     break;
             }
+        }
 
-        if(connection_mode == RECORDING) 
         case HCI_SCO_DATA_PACKET:
+            if(connection_mode == RECORDING) {
             if (READ_SCO_CONNECTION_HANDLE(event) != sco_handle) break;
-            // printf("recieved sco packet size: %d bytes \n\n", (event_size-3));
-            sco_receive(event, event_size);
-            bytes_recieved += SCO_PACKET_SIZE;
-                    if(bytes_recieved >= SECONDS_TO_BYTES) {
-                        abort_audio(acl_handle);
-                        printf("\n\n microphone playback completed.  \n Press 4 to listen to mic again.");
-                    } 
+            sco_receive(event, event_size); 
+            data_bytes += SCO_PACKET_SIZE;
+            }
             break;
         default:
             break;
+        
     }
 }
 
@@ -305,6 +282,20 @@ void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * event, uint
 
             switch (hci_event_hfp_meta_get_subevent_code(event)) 
             {
+                case HFP_SUBEVENT_AUDIO_CONNECTION_ESTABLISHED:
+                    if (hfp_subevent_audio_connection_established_get_status(event) != ERROR_CODE_SUCCESS){
+                        printf("Audio connection establishment failed with status 0x%02x\n", hfp_subevent_audio_connection_established_get_status(event));
+                    } else {
+                        sco_handle = hfp_subevent_audio_connection_established_get_sco_handle(event);
+                        printf("Audio connection established with SCO handle 0x%04x.\n", sco_handle);
+                        negotiated_codec = hfp_subevent_audio_connection_established_get_negotiated_codec(event);
+
+    sco_set_codec(negotiated_codec, connection_mode);
+    if(connection_mode == PLAYBACK) {
+        hci_request_sco_can_send_now_event();}
+    audio_streaming = 1;
+                    }
+                    break;
                 case HFP_SUBEVENT_SERVICE_LEVEL_CONNECTION_ESTABLISHED:
                     status = hfp_subevent_service_level_connection_established_get_status(event);
                     if (status != ERROR_CODE_SUCCESS){
@@ -319,38 +310,15 @@ void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * event, uint
                     printf("Service level connection released.\n");
                     acl_handle = HCI_CON_HANDLE_INVALID;
                     break;
-                case HFP_SUBEVENT_AUDIO_CONNECTION_ESTABLISHED:
-                    if (hfp_subevent_audio_connection_established_get_status(event) != ERROR_CODE_SUCCESS){
-                        printf("Audio connection establishment failed with status 0x%02x\n", hfp_subevent_audio_connection_established_get_status(event));
-                    } else {
-                        sco_handle = hfp_subevent_audio_connection_established_get_sco_handle(event);
-                        printf("Audio connection established with SCO handle 0x%04x.\n", sco_handle);
-                        negotiated_codec = hfp_subevent_audio_connection_established_get_negotiated_codec(event);
-                        switch (negotiated_codec){
-                            case HFP_CODEC_CVSD:
-                                printf("Using CVSD codec.\n");
-                                break;
-                            case HFP_CODEC_MSBC:
-                                printf("Using mSBC codec.\n");
-                                break;
-                            case HFP_CODEC_LC3_SWB:
-                                printf("Using LC3-SWB codec.\n");
-                                break;
-                            default:
-                                printf("Using unknown codec 0x%02x.\n", negotiated_codec);
-                                break;
-                        }
-                        sco_set_codec(negotiated_codec);
-                        hci_request_sco_can_send_now_event();
-                    }
-                    break;
 
                 case HFP_SUBEVENT_AUDIO_CONNECTION_RELEASED:
                     printf("Audio connection released\n");
                     sco_handle = HCI_CON_HANDLE_INVALID;
                     sco_close();
+                    data_bytes = 0;
+                    audio_streaming = 0;
+                    cycle_number++;
                     break;
-
                 case HFP_SUBEVENT_SPEAKER_VOLUME:
                     printf("Speaker volume: gain %u\n",
                            hfp_subevent_speaker_volume_get_gain(event));

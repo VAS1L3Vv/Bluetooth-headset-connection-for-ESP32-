@@ -8,6 +8,7 @@
 #include "classic/btstack_sbc.h"
 #include "classic/hfp.h"
 
+
 // number of sco packets until 'report' on console
 #define SCO_REPORT_PERIOD           130
 // constants

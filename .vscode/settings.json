@@ -21,6 +21,11 @@
         "*.inc": "c",
         "*.tcc": "c",
         "complex": "c",
-        "fstream": "c"
-    }
+        "fstream": "c",
+        "hfp.h": "c"
+    },
+    "idf.openOcdConfigs": [
+        "interface/ftdi/esp32_devkitj_v1.cfg",
+        "target/esp32.cfg"
+    ]
 }

@@ -19,26 +19,19 @@
 #define PREBUFFER_BYTES_MAX PREBUFFER_BYTES_8KHZ
 #define SAMPLES_PER_FRAME_MAX 60
 static uint16_t              audio_prebuffer_bytes;
-
-// output
 static int                   audio_output_paused  = 0;
 static int                   audio_input_paused   = 0;
-static uint8_t               audio_ring_buffer_storage[AUDIO_BUFFER_SIZE_BYTES]; // указатель памяти кольцевого буффера
-static uint8_t               encode_ring_buffer[CODEC_BUFFER_SIZE_BYTES];
-static uint8_t               encode_ring_buffer[CODEC_BUFFER_SIZE_BYTES];
+static uint8_t               codec2_frame_storage[NUMBER_OF_FRAMES][CODEC2_FRAME_SIZE]; // указатель памяти кольцевого буффера
+static uint8_t               encode_ring_buffer_storage[ENC_BUFFER_SIZE_BYTES];
+static uint8_t               decode_ring_buffer_storage[DEC_BUFFER_SIZE_BYTES];
 
 static btstack_ring_buffer_t encode_ring_buffer;
 static btstack_ring_buffer_t decode_ring_buffer;
-static btstack_ring_buffer_t audio_ring_buffer;
 
-// input
 static int count_sent = 0;
 static int count_received = 0;
 static btstack_cvsd_plc_state_t cvsd_plc_state;
 static uint8_t sec = 0;
-
-int num_samples_to_write;
-int num_audio_frames;
 
 // generic codec support
 typedef struct {
@@ -58,12 +51,6 @@ bool codec2_enabled()
     return is_codec2_on;
 }
 
-static void encode_and_write()
-{
-    if(btstack_ring_buffer_bytes_available < 640)
-        return;
-}
-
 static void read_and_decode()
 {
 
@@ -79,9 +66,11 @@ struct CODEC2 * cdc2_s;
 // return 1 if ok
 static int audio_initialize(int sample_rate) {
     cdc2_s = codec2_create(8);
-    memset(audio_ring_buffer_storage, 0, sizeof(audio_ring_buffer_storage));
-    btstack_ring_buffer_init(&encode_ring_buffer, audio_ring_buffer_storage, sizeof(audio_ring_buffer_storage));
-    btstack_ring_buffer_init(&encode_ring_buffer, audio_ring_buffer_storage, sizeof(audio_ring_buffer_storage));
+    memset(codec2_frame_storage, 0, sizeof(codec2_frame_storage));
+    memset(encode_ring_buffer_storage, 0, sizeof(encode_ring_buffer_storage));
+    memset(decode_ring_buffer_storage, 0, sizeof(decode_ring_buffer_storage));
+    btstack_ring_buffer_init(&encode_ring_buffer, encode_ring_buffer_storage, sizeof(encode_ring_buffer_storage));
+    btstack_ring_buffer_init(&decode_ring_buffer, decode_ring_buffer_storage, sizeof(encode_ring_buffer_storage));
     audio_output_paused  = 1;
     return 1;
 }
@@ -93,7 +82,7 @@ static void cvsd_init(void) {
 }
 
 static void cvsd_receive(const uint8_t * packet, uint16_t size) {
-    static int16_t audio_frame_out[128];
+    static int16_t audio_frame_out[SCO_PACKET_SIZE];
     if (size > sizeof(audio_frame_out)){
         printf("cvsd_receive: SCO packet larger than local output buffer - dropping data.\n");
         return;
@@ -102,7 +91,7 @@ static void cvsd_receive(const uint8_t * packet, uint16_t size) {
     const int num_samples = audio_bytes_read / BYTES_PER_FRAME;
 
     // convert into host endian
-    static int16_t audio_frame_in[128];
+    static int16_t audio_frame_in[SCO_PACKET_SIZE];
 
     for (int i=0;i<num_samples;i++){
         audio_frame_in[i] = little_endian_read_16(packet, 3 + i * 2);
@@ -111,11 +100,31 @@ static void cvsd_receive(const uint8_t * packet, uint16_t size) {
     // treat packet as bad frame if controller does not report 'all good'
     bool bad_frame = (packet[1] & 0x30) != 0;
     btstack_cvsd_plc_process_data(&cvsd_plc_state, bad_frame, audio_frame_in, num_samples, audio_frame_out);
-        btstack_ring_buffer_write(&encode_ring_buffer, (uint8_t *)audio_frame_out, audio_bytes_read);
-
+        btstack_ring_buffer_write(&encode_ring_buffer, (uint8_t *)audio_frame_out, audio_bytes_read);        
 }
 
-static void cvsd_receive_null(const uint8_t * packet, uint16_t size){}
+#define FRAME_ENCODE_SUCCESS 0
+#define NOT_ENOUGH_BYTES 1
+#define FRAME_BUFFER_FULL 2
+
+static int encode_and_write() 
+{
+    if(btstack_ring_buffer_bytes_available(&encode_ring_buffer) < 640)
+        return NOT_ENOUGH_BYTES;
+
+    static int i = 0;
+        if(i == NUMBER_OF_FRAMES)
+        {
+            return FRAME_BUFFER_FULL;
+        }
+    int16_t audio_to_encode[CODEC2_AUDIO_SIZE];
+    uint8_t encoded_frame_bytes[CODEC2_FRAME_SIZE];
+
+    btstack_ring_buffer_read(&encode_ring_buffer, (int16_t*)audio_to_encode, CODEC2_AUDIO_SIZE, NULL);
+    codec2_encode(cdc2_s, &encoded_frame_bytes, &audio_to_encode);
+    memcpy(&codec2_frame_storage[i], &encoded_frame_bytes);
+    i++;
+}
 
 static void cvsd_fill_payload(uint8_t * payload_buffer, uint16_t sco_payload_length) {
     uint16_t bytes_to_copy = sco_payload_length;
@@ -146,6 +155,7 @@ static void cvsd_fill_payload(uint8_t * payload_buffer, uint16_t sco_payload_len
 }
 
 static void cvsd_fill_null(uint8_t * payload_buffer, uint16_t sco_payload_length){}
+static void cvsd_receive_null(const uint8_t * packet, uint16_t size){}
 
 static void cvsd_close(void) { 
     printf("Used CVSD with PLC, number of proccesed frames: \n - %d good frames, \n - %d bad frames.\n", cvsd_plc_state.good_frames_nr, cvsd_plc_state.bad_frames_nr);
@@ -196,32 +206,14 @@ void sco_set_codec(uint8_t negotiated_codec, bool con_mode)
 }
 
 void sco_receive(uint8_t * packet, uint16_t size){
-    static uint32_t packets = 0;
-    static uint32_t crc_errors = 0;
-    static uint32_t data_received = 0;
-    static uint32_t byte_errors = 0;
 
-    count_received++;
-
-    data_received += size - 3;
-    packets++;
-    if (data_received > 100000){
-        // printf("Summary: data %07u, packets %04u, packet with crc errors %0u, byte errors %04u\n",  (unsigned int) data_received,  (unsigned int) packets, (unsigned int) crc_errors, (unsigned int) byte_errors);
-        crc_errors = 0;
-        byte_errors = 0;
-        data_received = 0;
-        packets = 0;
-    }
-    encode_audio_codec2();
+    encode_and_write();
     codec_current->receive(packet, size);
     count_sent++;
     if ((count_sent % SCO_REPORT_PERIOD) == 0) {
-        // printf("SCO: sent %u, received %u\n", count_sent, count_received);
         printf("\n%d\n",sec);
     sec++;
     }
-    if(sec == 10)
-    sec = 0;
 }
 
 void sco_send(hci_con_handle_t sco_handle){

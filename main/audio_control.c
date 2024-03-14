@@ -23,12 +23,13 @@ static uint16_t              audio_prebuffer_bytes;
 // output
 static int                   audio_output_paused  = 0;
 static int                   audio_input_paused   = 0;
-static uint8_t               audio_ring_buffer_storage[MAX_BUFFER_SIZE_BYTES]; // указатель памяти кольцевого буффера
-static uint8_t               encoded_frame_rx[8];
-static uint8_t               encoded_frame_tx[8];
+static uint8_t               audio_ring_buffer_storage[AUDIO_BUFFER_SIZE_BYTES]; // указатель памяти кольцевого буффера
+static uint8_t               encode_ring_buffer[CODEC_BUFFER_SIZE_BYTES];
+static uint8_t               encode_ring_buffer[CODEC_BUFFER_SIZE_BYTES];
 
 static btstack_ring_buffer_t encode_ring_buffer;
 static btstack_ring_buffer_t decode_ring_buffer;
+static btstack_ring_buffer_t audio_ring_buffer;
 
 // input
 static int count_sent = 0;

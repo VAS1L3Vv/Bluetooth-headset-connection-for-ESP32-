@@ -237,7 +237,6 @@ void sco_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * event, 
             break;
         default:
             break;
-        
     }
 }
 

@@ -20,7 +20,7 @@ extern "C" {
 #define FRAME_SIZE CODEC2_FRAME_SIZE
 #define FRAME_LENGTH FRAME_SIZE/BYTES_PER_SAMPLE
 #define NUMBER_OF_FRAMES        10
-#define MAX_BUFFER_SIZE_BYTES   65000
+#define MAX_BUFFER_SIZE_BYTES   5000
 #define PLAYBACK                0 
 #define RECORDING               1
 

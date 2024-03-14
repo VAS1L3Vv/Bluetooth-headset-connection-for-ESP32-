@@ -1,7 +1,7 @@
 {
     "idf.adapterTargetName": "esp32",
     "idf.flashType": "UART",
-    "idf.portWin": "COM11",
+    "idf.portWin": "COM3",
     "files.associations": {
         "sco_demo_util.h": "c",
         "btstack_config.h": "c",
@@ -22,7 +22,8 @@
         "*.tcc": "c",
         "complex": "c",
         "fstream": "c",
-        "hfp.h": "c"
+        "hfp.h": "c",
+        "codec2.h": "c"
     },
     "idf.openOcdConfigs": [
         "interface/ftdi/esp32_devkitj_v1.cfg",

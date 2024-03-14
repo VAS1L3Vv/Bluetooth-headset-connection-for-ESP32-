@@ -57,13 +57,13 @@ bool codec2_enabled()
     return is_codec2_on;
 }
 
-static void encode_audio_codec2()
+static void encode_and_write()
 {
     if(btstack_ring_buffer_bytes_available < 640)
         return;
 }
 
-static void decode_audio_codec2()
+static void read_and_decode()
 {
 
 }
@@ -80,6 +80,7 @@ static int audio_initialize(int sample_rate) {
     cdc2_s = codec2_create(8);
     memset(audio_ring_buffer_storage, 0, sizeof(audio_ring_buffer_storage));
     btstack_ring_buffer_init(&encode_ring_buffer, audio_ring_buffer_storage, sizeof(audio_ring_buffer_storage));
+    btstack_ring_buffer_init(&encode_ring_buffer, audio_ring_buffer_storage, sizeof(audio_ring_buffer_storage));
     audio_output_paused  = 1;
     return 1;
 }
@@ -91,35 +92,26 @@ static void cvsd_init(void) {
 }
 
 static void cvsd_receive(const uint8_t * packet, uint16_t size) {
-    int16_t buf1[40];
-    int16_t buf2[40];
-    int16_t buf3[40];
-    int16_t audio_frame_out[128];
+    static int16_t audio_frame_out[128];
     if (size > sizeof(audio_frame_out)){
         printf("cvsd_receive: SCO packet larger than local output buffer - dropping data.\n");
         return;
     }
-
     const int audio_bytes_read = size - 3;
     const int num_samples = audio_bytes_read / BYTES_PER_FRAME;
 
     // convert into host endian
-    int16_t audio_frame_in[128];
-    int i;
-    for (i=0;i<num_samples;i++){
+    static int16_t audio_frame_in[128];
+
+    for (int i=0;i<num_samples;i++){
         audio_frame_in[i] = little_endian_read_16(packet, 3 + i * 2);
     }
 
     // treat packet as bad frame if controller does not report 'all good'
     bool bad_frame = (packet[1] & 0x30) != 0;
     btstack_cvsd_plc_process_data(&cvsd_plc_state, bad_frame, audio_frame_in, num_samples, audio_frame_out);
-    for(int i = 0; i < 40; i++) {
-        buf1[i] = audio_frame_out[i];
-        buf2[i] = audio_frame_out[i+40];
-        buf3[i] = audio_frame_out[i+119];
-    }
-    
-    btstack_ring_buffer_write(&encode_ring_buffer, (uint8_t *)encoded_frame_rx, 40);
+        btstack_ring_buffer_write(&encode_ring_buffer, (uint8_t *)audio_frame_out, audio_bytes_read);
+
 }
 
 static void cvsd_receive_null(const uint8_t * packet, uint16_t size){}

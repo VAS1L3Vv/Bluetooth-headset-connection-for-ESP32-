@@ -21,9 +21,9 @@
 static uint16_t              audio_prebuffer_bytes;
 static int                   audio_output_paused  = 0;
 static int                   audio_input_paused   = 0;
-static uint8_t               codec2_frame_storage[NUMBER_OF_FRAMES][CODEC2_FRAME_SIZE]; // указатель памяти кольцевого буффера
+static uint8_t               codec2_frame_storage[NUMBER_OF_FRAMES*CODEC2_FRAME_SIZE]; // указатель памяти кольцевого буффера
 static uint8_t               encode_ring_buffer_storage[ENC_BUFFER_SIZE_BYTES];
-static uint8_t               decode_ring_buffer_storage[DEC_BUFFER_SIZE_BYTES];
+static uint8_t               decode_ring_buffer_storage[ENC_BUFFER_SIZE_BYTES];
 
 static btstack_ring_buffer_t encode_ring_buffer;
 static btstack_ring_buffer_t decode_ring_buffer;
@@ -32,6 +32,8 @@ static int count_sent = 0;
 static int count_received = 0;
 static btstack_cvsd_plc_state_t cvsd_plc_state;
 static uint8_t sec = 0;
+static int wi = 0;
+static int ri = 0;
 
 // generic codec support
 typedef struct {
@@ -51,11 +53,6 @@ bool codec2_enabled()
     return is_codec2_on;
 }
 
-static void read_and_decode()
-{
-
-}
-
 void set_codec2_state(bool on_off)
 {
     is_codec2_on = on_off;
@@ -66,11 +63,13 @@ struct CODEC2 * cdc2_s;
 // return 1 if ok
 static int audio_initialize(int sample_rate) {
     cdc2_s = codec2_create(8);
+    ri = 0;
+    wi = 0;
     memset(codec2_frame_storage, 0, sizeof(codec2_frame_storage));
     memset(encode_ring_buffer_storage, 0, sizeof(encode_ring_buffer_storage));
     memset(decode_ring_buffer_storage, 0, sizeof(decode_ring_buffer_storage));
     btstack_ring_buffer_init(&encode_ring_buffer, encode_ring_buffer_storage, sizeof(encode_ring_buffer_storage));
-    btstack_ring_buffer_init(&decode_ring_buffer, decode_ring_buffer_storage, sizeof(encode_ring_buffer_storage));
+    btstack_ring_buffer_init(&decode_ring_buffer, decode_ring_buffer_storage, sizeof(decode_ring_buffer_storage));
     audio_output_paused  = 1;
     return 1;
 }
@@ -107,35 +106,54 @@ static void cvsd_receive(const uint8_t * packet, uint16_t size) {
 #define NOT_ENOUGH_BYTES 1
 #define FRAME_BUFFER_FULL 2
 
+static const uint32_t audio_packet_length = CODEC2_AUDIO_SIZE;
+    
 static int encode_and_write() 
 {
+    printf("\n Bytes to read: %d \n", btstack_ring_buffer_bytes_available(&encode_ring_buffer));
     if(btstack_ring_buffer_bytes_available(&encode_ring_buffer) < 640)
-        return NOT_ENOUGH_BYTES;
+    return NOT_ENOUGH_BYTES;
 
-    static int i = 0;
-        if(i == NUMBER_OF_FRAMES)
+        if(wi == NUMBER_OF_FRAMES)
         {
             return FRAME_BUFFER_FULL;
         }
-    int16_t audio_to_encode[CODEC2_AUDIO_SIZE];
-    uint8_t encoded_frame_bytes[CODEC2_FRAME_SIZE];
-
-    btstack_ring_buffer_read(&encode_ring_buffer, (int16_t*)audio_to_encode, CODEC2_AUDIO_SIZE, NULL);
+        uint8_t audio_to_encode[CODEC2_AUDIO_SIZE*BYTES_PER_SAMPLE];
+        uint8_t encoded_frame_bytes[CODEC2_FRAME_SIZE*BYTES_PER_SAMPLE];
+    static uint32_t bytes_read = 0;
+    btstack_ring_buffer_read(&encode_ring_buffer, (uint8_t*)audio_to_encode, audio_packet_length*2, &bytes_read);
     codec2_encode(cdc2_s, &encoded_frame_bytes, &audio_to_encode);
-    memcpy(&codec2_frame_storage[i], &encoded_frame_bytes);
-    i++;
+    memcpy(&codec2_frame_storage+wi, &encoded_frame_bytes, CODEC2_FRAME_SIZE);
+    wi++;
+    return FRAME_ENCODE_SUCCESS;
+}
+
+static int read_and_decode()
+{
+    printf("\n Bytes to write: %d \n", btstack_ring_buffer_bytes_free(&decode_ring_buffer));
+    if(btstack_ring_buffer_bytes_free(&decode_ring_buffer) < 640) 
+    return NOT_ENOUGH_BYTES; 
+
+        if(ri == NUMBER_OF_FRAMES)
+        {
+            return FRAME_BUFFER_FULL;
+        }
+        uint8_t decoded_audio[CODEC2_AUDIO_SIZE*BYTES_PER_SAMPLE];
+        uint8_t encoded_frame_bytes[CODEC2_FRAME_SIZE*BYTES_PER_SAMPLE];
+    memcpy(&encoded_frame_bytes, &codec2_frame_storage+ri, CODEC2_FRAME_SIZE);
+    codec2_decode(cdc2_s, &decoded_audio, &encoded_frame_bytes);
+    btstack_ring_buffer_write(&decode_ring_buffer, (uint8_t*)decoded_audio, audio_packet_length*2);
+    ri++;
+    return FRAME_ENCODE_SUCCESS;
 }
 
 static void cvsd_fill_payload(uint8_t * payload_buffer, uint16_t sco_payload_length) {
     uint16_t bytes_to_copy = sco_payload_length;
-    
-    // get data from ringbuffer
     uint16_t pos = 0;
     if (!audio_input_paused){
         uint16_t samples_to_copy = sco_payload_length / 2;
         uint32_t bytes_read = 0;
-        btstack_ring_buffer_read(&decode_ring_buffer, encoded_frame_rx, 8, &bytes_read);
-        codec2_decode(cdc2_s, (int16_t*)payload_buffer, encoded_frame_rx);
+        btstack_ring_buffer_read(&decode_ring_buffer, payload_buffer, sco_payload_length, &bytes_read);
         if (btstack_is_big_endian()) {
             uint16_t i;
             for (i=0;i<samples_to_copy/2;i+=2){
@@ -207,7 +225,9 @@ void sco_set_codec(uint8_t negotiated_codec, bool con_mode)
 
 void sco_receive(uint8_t * packet, uint16_t size){
 
-    encode_and_write();
+    int stat = encode_and_write();
+    if(stat == FRAME_BUFFER_FULL) return;
+
     codec_current->receive(packet, size);
     count_sent++;
     if ((count_sent % SCO_REPORT_PERIOD) == 0) {
@@ -220,11 +240,13 @@ void sco_send(hci_con_handle_t sco_handle){
 
     if (sco_handle == HCI_CON_HANDLE_INVALID) return;
 
+    int stat = read_and_decode();
+    if(stat == FRAME_BUFFER_FULL) return;
+
     int sco_packet_length = hci_get_sco_packet_length();
     int sco_payload_length = sco_packet_length - 3;
-
-    hci_reserve_packet_buffer(); // подготовка к отправке пакета
     uint8_t * sco_packet = hci_get_outgoing_packet_buffer(); // получаем указатель на передаваемый sco пакет
+    hci_reserve_packet_buffer(); // подготовка к отправке пакета
 
     if (audio_input_paused){
         if (btstack_ring_buffer_bytes_available(&decode_ring_buffer) >= audio_prebuffer_bytes){
